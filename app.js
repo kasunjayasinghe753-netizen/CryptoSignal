@@ -1,4 +1,6 @@
 
+let signalFilter = "ALL";
+
 function show(page) {
   const main = document.querySelector("main");
 
@@ -49,12 +51,24 @@ function show(page) {
 
   if (page === "Signals") {
     main.innerHTML = `
-      <h3>Live Signals</h3>
+      <h3>CRYPTOSIGNAL46 Signals</h3>
+
       <div class="card">
-        <p class="green">LONG / SHORT</p>
-        <p>Waiting for VPS connection</p>
+        <p><strong>Signal Center</strong></p>
+        <p>Market: OKX USDT Perpetual</p>
+        <p id="signalCount">0 Signals</p>
+
+        <div class="signal-filters">
+          <button onclick="setSignalFilter('ALL')">ALL</button>
+          <button onclick="setSignalFilter('LONG')">LONG</button>
+          <button onclick="setSignalFilter('SHORT')">SHORT</button>
+        </div>
       </div>
+
+      <div id="signalList"></div>
     `;
+
+    renderSignals(window.CRYPTOSIGNAL46_SIGNALS || []);
     return;
   }
 
@@ -67,6 +81,70 @@ function show(page) {
     `;
   }
 }
+
+function setSignalFilter(filter) {
+  signalFilter = filter;
+  renderSignals(window.CRYPTOSIGNAL46_SIGNALS || []);
+}
+
+function renderSignals(signals) {
+  const list = document.getElementById("signalList");
+  const count = document.getElementById("signalCount");
+
+  if (!list) return;
+
+  const filtered = signals.filter(signal =>
+    signalFilter === "ALL" || signal.side === signalFilter
+  );
+
+  count.textContent = filtered.length + " Signals";
+
+  if (filtered.length === 0) {
+    list.innerHTML = `
+      <div class="card">
+        <h3>No Signals Yet</h3>
+        <p>Waiting for VPS connection...</p>
+        <p>LONG and SHORT signals will appear here.</p>
+      </div>
+    `;
+    return;
+  }
+
+  list.innerHTML = filtered.map(signal => {
+    const sideClass = signal.side === "LONG" ? "green" : "red";
+
+    const entry = signal.entry !== undefined
+      ? signal.entry
+      : `${signal.entryLow ?? "-"} - ${signal.entryHigh ?? "-"}`;
+
+    return `
+      <div class="card signal-card">
+        <h3 class="${sideClass}">
+          ${signal.side} - ${signal.symbol}
+        </h3>
+
+        <p>Entry Type: <strong>${signal.entryType || "-"}</strong></p>
+        <p>Entry Zone: ${entry}</p>
+
+        <p class="red">Stop Loss: ${signal.sl ?? "-"}</p>
+
+        <p class="green">TP1: ${signal.tp1 ?? "-"}</p>
+        <p class="green">TP2: ${signal.tp2 ?? "-"}</p>
+        <p class="green">TP3: ${signal.tp3 ?? "-"}</p>
+
+        <hr>
+        <p>Status: <strong>${signal.status || "PENDING"}</strong></p>
+        <small>${signal.createdAt || ""}</small>
+      </div>
+    `;
+  }).join("");
+}
+
+// Future VPS connection can update signals using this function.
+window.updateCryptoSignals = function(signals) {
+  window.CRYPTOSIGNAL46_SIGNALS = signals;
+  renderSignals(signals);
+};
 
 function calculate() {
   const margin = Number(document.getElementById("margin").value);
@@ -100,7 +178,6 @@ function calculate() {
   const position = margin * leverage;
   const quantity = position / entry;
 
-  // TP1: Close 25%, keep 75%
   const closePercent = 0.25;
   const remainingPercent = 0.75;
 
@@ -121,11 +198,9 @@ function calculate() {
   const tp3Total =
     tp1PartialProfit + priceProfit(tp3, remainingQty);
 
-  // After TP1, SL moves to TP1 price
   const protectedProfit =
     tp1PartialProfit + priceProfit(tp1, remainingQty);
 
-  // Initial SL before TP1
   const initialLoss = priceProfit(sl, quantity);
 
   const fmt = n => n.toFixed(2);
