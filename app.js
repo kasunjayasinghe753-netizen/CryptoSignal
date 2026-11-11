@@ -1,5 +1,6 @@
 
 let signalFilter = "ALL";
+let activePage = "Dashboard";
 
 const API_BASE = "https://187.55.163.68";
 
@@ -20,7 +21,10 @@ function mapApiSignal(s) {
     tp2: s.tp2,
     tp3: s.tp3,
     status: s.status,
-    createdAt: s.created_at ?? s.createdAt
+    createdAt: s.created_at ?? s.createdAt,
+    result: s.result,
+    exitReason: s.exit_reason ?? s.exitReason,
+    score: s.score
   };
 }
 
@@ -129,11 +133,157 @@ async function loadSignalHistory() {
   }
 }
 
+
+function dashboardRows(data, fallbackKeys) {
+  if (Array.isArray(data)) return data;
+  for (const key of fallbackKeys) {
+    if (Array.isArray(data?.[key])) return data[key];
+  }
+  return [];
+}
+
+function dashboardEscape(value) {
+  return String(value ?? "-").replace(/[&<>"']/g, ch => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+  })[ch]);
+}
+
+function renderDashboard(signals = window.CRYPTOSIGNAL46_SIGNALS || [],
+                         history = window.CRYPTOSIGNAL46_HISTORY || []) {
+  if (activePage !== "Dashboard") return;
+
+  const main = document.querySelector("main");
+  if (!main) return;
+
+  const active = signals.filter(s => ["OPEN", "PENDING"].includes(String(s.status || "").toUpperCase()));
+  const closed = history.length;
+  const outcomes = history.map(s => String(s.result || "").toUpperCase());
+  const wins = outcomes.filter(x => x === "WIN").length;
+  const losses = outcomes.filter(x => x === "LOSS").length;
+  const decided = wins + losses;
+  const winRate = decided ? (wins / decided * 100).toFixed(1) + "%" : "--";
+  const total = active.length + closed;
+
+  const latest = [...signals].sort((a, b) => Number(b.id || 0) - Number(a.id || 0)).slice(0, 5);
+
+  main.innerHTML = `
+    <div class="dashboard-heading">
+      <div>
+        <h3>Home Dashboard</h3>
+        <small>Live OKX USDT Perpetual signals</small>
+      </div>
+      <span class="live-indicator">● LIVE</span>
+    </div>
+
+    <div class="stats dashboard-stats">
+      <div class="card">
+        <small>TOTAL SIGNALS</small>
+        <div class="number">${total}</div>
+      </div>
+      <div class="card">
+        <small>ACTIVE SIGNALS</small>
+        <div class="number green">${active.length}</div>
+      </div>
+      <div class="card">
+        <small>WIN RATE</small>
+        <div class="number">${winRate}</div>
+        <small>${wins} wins / ${losses} losses</small>
+      </div>
+      <div class="card">
+        <small>CLOSED SIGNALS</small>
+        <div class="number">${closed}</div>
+      </div>
+    </div>
+
+    <div class="dashboard-section-title">
+      <h3>Latest Signals</h3>
+      <small>Refreshes every 30 seconds</small>
+    </div>
+
+    ${latest.length ? latest.map(signal => {
+      const side = String(signal.side || "").toUpperCase();
+      const status = String(signal.status || "PENDING").toUpperCase();
+      const entry = signal.entry ?? (
+        signal.entryLow != null || signal.entryHigh != null
+          ? `${signal.entryLow ?? "-"} – ${signal.entryHigh ?? "-"}`
+          : "-"
+      );
+      return `
+        <div class="card dashboard-signal-card">
+          <div class="signal">
+            <strong>${dashboardEscape(signal.symbol)}</strong>
+            <span class="tag ${side === "SHORT" ? "short-tag" : ""}">${dashboardEscape(side)}</span>
+          </div>
+          <div class="dashboard-signal-meta">
+            <span>Status: <strong>${dashboardEscape(status)}</strong></span>
+            <span>Entry: <strong>${dashboardEscape(entry)}</strong></span>
+          </div>
+          <div class="dashboard-levels">
+            <span>SL <b class="red">${dashboardEscape(signal.sl)}</b></span>
+            <span>TP1 <b class="green">${dashboardEscape(signal.tp1)}</b></span>
+            <span>TP2 <b class="green">${dashboardEscape(signal.tp2)}</b></span>
+            <span>TP3 <b class="green">${dashboardEscape(signal.tp3)}</b></span>
+          </div>
+        </div>
+      `;
+    }).join("") : `
+      <div class="card">
+        <strong>No active signals</strong>
+        <p><small>New signals will appear here when the bot publishes them.</small></p>
+      </div>
+    `}
+  `;
+}
+
+async function loadDashboardData() {
+  try {
+    const [signalsResponse, historyResponse] = await Promise.all([
+      fetch(`${API_BASE}/api/signals`),
+      fetch(`${API_BASE}/api/history`)
+    ]);
+
+    if (!signalsResponse.ok) throw new Error("Signals API error: " + signalsResponse.status);
+    if (!historyResponse.ok) throw new Error("History API error: " + historyResponse.status);
+
+    const [signalsData, historyData] = await Promise.all([
+      signalsResponse.json(),
+      historyResponse.json()
+    ]);
+
+    const signalRows = dashboardRows(signalsData, ["signals", "data"]);
+    const historyRows = dashboardRows(historyData, ["signals", "history", "data"]);
+
+    window.CRYPTOSIGNAL46_SIGNALS = signalRows.map(mapApiSignal);
+    window.CRYPTOSIGNAL46_HISTORY = historyRows.map(mapApiSignal);
+
+    renderSignals(window.CRYPTOSIGNAL46_SIGNALS);
+    renderDashboard();
+    console.log("CRYPTOSIGNAL46: Dashboard updated", {
+      active: signalRows.length,
+      closed: historyRows.length
+    });
+  } catch (error) {
+    console.error("Dashboard loading failed:", error);
+    if (activePage === "Dashboard") {
+      const main = document.querySelector("main");
+      if (main) main.innerHTML = `
+        <h3>Home Dashboard</h3>
+        <div class="card">
+          <strong>Could not connect to VPS</strong>
+          <p><small>Dashboard data will be retried automatically.</small></p>
+        </div>
+      `;
+    }
+  }
+}
+
 function show(page) {
+  activePage = page;
   const main = document.querySelector("main");
 
   if (page === "Dashboard") {
-    location.reload();
+    renderDashboard();
+    loadDashboardData();
     return;
   }
 
@@ -274,6 +424,7 @@ function renderSignals(signals) {
 window.updateCryptoSignals = function(signals) {
   window.CRYPTOSIGNAL46_SIGNALS = signals;
   renderSignals(signals);
+  renderDashboard();
 };
 
 function calculate() {
@@ -393,10 +544,8 @@ function calculate() {
   `;
 }
 
-// Load signals automatically when the app opens.
+// Load the live dashboard when the app opens and refresh it every 30 seconds.
 window.addEventListener("load", () => {
-  loadCryptoSignals();
-
-  // Refresh signals every 15 minutes.
-  setInterval(loadCryptoSignals, 15 * 60 * 1000);
+  loadDashboardData();
+  setInterval(loadDashboardData, 30 * 1000);
 });
