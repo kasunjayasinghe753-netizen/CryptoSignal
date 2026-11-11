@@ -154,3 +154,67 @@ button {
 .card:last-child {
   margin-bottom: 25px;
 }
+
+
+/* Live Home Dashboard */
+.dashboard-heading,
+.dashboard-section-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.dashboard-heading h3,
+.dashboard-section-title h3 {
+  margin-top: 18px;
+  margin-bottom: 5px;
+}
+.live-indicator {
+  color: #36e6a0;
+  font-size: 11px;
+  font-weight: bold;
+  white-space: nowrap;
+}
+.dashboard-stats .card {
+  min-width: 0;
+}
+.dashboard-stats .number {
+  overflow-wrap: anywhere;
+}
+.dashboard-section-title {
+  margin: 18px 0 10px;
+}
+.dashboard-section-title h3 {
+  margin: 0;
+}
+.dashboard-section-title small {
+  text-align: right;
+}
+.dashboard-signal-card {
+  border: 1px solid #26364a;
+}
+.dashboard-signal-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+  font-size: 13px;
+  color: #9ba9ba;
+}
+.dashboard-levels {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+  font-size: 12px;
+}
+.dashboard-levels span {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+}
+.short-tag {
+  background: #3b2028;
+  color: #ff6577;
+}
