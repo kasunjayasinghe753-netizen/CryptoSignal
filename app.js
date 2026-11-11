@@ -1,6 +1,134 @@
 
 let signalFilter = "ALL";
 
+const API_BASE = "https://187.55.163.68";
+
+window.CRYPTOSIGNAL46_SIGNALS = [];
+window.CRYPTOSIGNAL46_HISTORY = [];
+
+function mapApiSignal(s) {
+  return {
+    id: s.id,
+    symbol: s.symbol,
+    side: s.side,
+    entryType: s.entry_type ?? s.entryType,
+    entry: s.entry,
+    entryLow: s.entry_low ?? s.entryLow,
+    entryHigh: s.entry_high ?? s.entryHigh,
+    sl: s.sl ?? s.stop_loss ?? s.stopLoss,
+    tp1: s.tp1,
+    tp2: s.tp2,
+    tp3: s.tp3,
+    status: s.status,
+    createdAt: s.created_at ?? s.createdAt
+  };
+}
+
+async function loadCryptoSignals() {
+  try {
+    const response = await fetch(`${API_BASE}/api/signals`);
+
+    if (!response.ok) {
+      throw new Error("Signals API error: " + response.status);
+    }
+
+    const data = await response.json();
+
+    const rows = Array.isArray(data)
+      ? data
+      : (data.signals || data.data || []);
+
+    window.updateCryptoSignals(rows.map(mapApiSignal));
+
+    console.log("CRYPTOSIGNAL46: Signals updated", rows.length);
+
+  } catch (error) {
+    console.error("Signal loading failed:", error);
+  }
+}
+
+async function loadSignalHistory() {
+  const main = document.querySelector("main");
+
+  main.innerHTML = `
+    <h3>Signal History</h3>
+    <div class="card">Loading history...</div>
+  `;
+
+  try {
+    const response = await fetch(`${API_BASE}/api/history`);
+
+    if (!response.ok) {
+      throw new Error("History API error: " + response.status);
+    }
+
+    const data = await response.json();
+
+    const rows = Array.isArray(data)
+      ? data
+      : (data.signals || data.history || data.data || []);
+
+    const history = rows.map(mapApiSignal);
+
+    window.CRYPTOSIGNAL46_HISTORY = history;
+
+    if (history.length === 0) {
+      main.innerHTML = `
+        <h3>Signal History</h3>
+        <div class="card">
+          <h3>No Closed Signals Yet</h3>
+          <p>Closed signals will appear here.</p>
+        </div>
+      `;
+      return;
+    }
+
+    main.innerHTML = `
+      <h3>Signal History</h3>
+
+      <div class="card">
+        <p>Total Closed Signals: <strong>${history.length}</strong></p>
+      </div>
+
+      ${history.map(signal => `
+        <div class="card signal-card">
+
+          <h3 class="${signal.side === "LONG" ? "green" : "red"}">
+            ${signal.side || "-"} - ${signal.symbol || "-"}
+          </h3>
+
+          <p>Entry Type: ${signal.entryType || "-"}</p>
+          <p>Entry: ${signal.entry ?? "-"}</p>
+          <p>Entry Zone: ${signal.entryLow ?? "-"} - ${signal.entryHigh ?? "-"}</p>
+
+          <p class="red">Stop Loss: ${signal.sl ?? "-"}</p>
+
+          <p class="green">TP1: ${signal.tp1 ?? "-"}</p>
+          <p class="green">TP2: ${signal.tp2 ?? "-"}</p>
+          <p class="green">TP3: ${signal.tp3 ?? "-"}</p>
+
+          <hr>
+
+          <p>Status: <strong>${signal.status || "CLOSED"}</strong></p>
+          <small>${signal.createdAt || ""}</small>
+
+        </div>
+      `).join("")}
+    `;
+
+  } catch (error) {
+    console.error("History loading failed:", error);
+
+    main.innerHTML = `
+      <h3>Signal History</h3>
+      <div class="card">
+        <p>Could not load history.</p>
+        <p>Please try again later.</p>
+      </div>
+    `;
+  }
+}
+
 function show(page) {
   const main = document.querySelector("main");
 
@@ -69,16 +197,14 @@ function show(page) {
     `;
 
     renderSignals(window.CRYPTOSIGNAL46_SIGNALS || []);
+
+    loadCryptoSignals();
     return;
   }
 
   if (page === "History") {
-    main.innerHTML = `
-      <h3>Signal History</h3>
-      <div class="card">
-        <p>History will appear after VPS connection.</p>
-      </div>
-    `;
+    loadSignalHistory();
+    return;
   }
 }
 
@@ -97,7 +223,9 @@ function renderSignals(signals) {
     signalFilter === "ALL" || signal.side === signalFilter
   );
 
-  count.textContent = filtered.length + " Signals";
+  if (count) {
+    count.textContent = filtered.length + " Signals";
+  }
 
   if (filtered.length === 0) {
     list.innerHTML = `
@@ -113,12 +241,13 @@ function renderSignals(signals) {
   list.innerHTML = filtered.map(signal => {
     const sideClass = signal.side === "LONG" ? "green" : "red";
 
-    const entry = signal.entry !== undefined
+    const entry = signal.entry !== undefined && signal.entry !== null
       ? signal.entry
       : `${signal.entryLow ?? "-"} - ${signal.entryHigh ?? "-"}`;
 
     return `
       <div class="card signal-card">
+
         <h3 class="${sideClass}">
           ${signal.side} - ${signal.symbol}
         </h3>
@@ -133,14 +262,15 @@ function renderSignals(signals) {
         <p class="green">TP3: ${signal.tp3 ?? "-"}</p>
 
         <hr>
+
         <p>Status: <strong>${signal.status || "PENDING"}</strong></p>
         <small>${signal.createdAt || ""}</small>
+
       </div>
     `;
   }).join("");
 }
 
-// Future VPS connection can update signals using this function.
 window.updateCryptoSignals = function(signals) {
   window.CRYPTOSIGNAL46_SIGNALS = signals;
   renderSignals(signals);
@@ -205,6 +335,7 @@ function calculate() {
 
   const fmt = n => n.toFixed(2);
   const roi = n => (n / margin * 100).toFixed(2) + "%";
+
   const rr = n => Math.abs(initialLoss) > 0
     ? (n / Math.abs(initialLoss)).toFixed(2) + "R"
     : "N/A";
@@ -261,3 +392,11 @@ function calculate() {
     </small>
   `;
 }
+
+// Load signals automatically when the app opens.
+window.addEventListener("load", () => {
+  loadCryptoSignals();
+
+  // Refresh signals every 15 minutes.
+  setInterval(loadCryptoSignals, 15 * 60 * 1000);
+});
