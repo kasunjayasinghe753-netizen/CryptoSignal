@@ -1,0 +1,81 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CRYPTOSIGNAL46</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#080d16;color:#fff;font-family:Arial,sans-serif;padding:20px}
+header{display:flex;align-items:center;gap:12px;margin-bottom:28px}
+.logo{background:#123b2e;color:#36e6a0;padding:12px;border-radius:12px;font-weight:bold}
+h2{margin:0;font-size:19px}
+small{color:#8d9aab}
+h3{margin-top:25px}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.card{background:#141e2c;padding:17px;border-radius:14px;margin-bottom:12px}
+.number{font-size:27px;font-weight:bold;margin-top:10px}
+.green{color:#36e6a0}
+.red{color:#ff6577}
+.signal{display:flex;justify-content:space-between;align-items:center}
+.tag{padding:7px 12px;border-radius:20px;background:#123b2e;color:#36e6a0;font-size:12px}
+nav{position:fixed;bottom:0;left:0;right:0;background:#111b29;display:flex;justify-content:space-around;padding:16px 5px}
+nav button{background:none;border:0;color:#9ba9ba;font-size:12px}
+nav button:focus{color:#36e6a0}
+main{padding-bottom:75px}
+</style>
+</head>
+<body>
+<header>
+<div class="logo">46</div>
+<div>
+<h2>CRYPTOSIGNAL46</h2>
+<small>TRADING SIGNAL CENTER</small>
+</div>
+</header>
+<main>
+<h3>Dashboard</h3>
+<div class="stats">
+<div class="card">
+<small>TOTAL SIGNALS</small>
+<div class="number">--</div>
+</div>
+<div class="card">
+<small>ACTIVE SIGNALS</small>
+<div class="number green">--</div>
+</div>
+</div>
+<h3>Latest Signals</h3>
+<div class="card">
+<div class="signal">
+<strong>BTC/USDT</strong>
+<span class="tag">LONG</span>
+</div>
+<p><small>Entry Price</small><br>--</p>
+<p><small>Stop Loss</small><br>--</p>
+<p><small>Take Profit</small><br>--</p>
+<small>Waiting for VPS connection</small>
+</div>
+<div class="card">
+<div class="signal">
+<strong>ETH/USDT</strong>
+<span class="tag" style="background:#3b2028;color:#ff6577">SHORT</span>
+</div>
+<small>Waiting for live signals</small>
+</div>
+</main>
+<nav>
+<button onclick="show('Dashboard')">⌂<br>Home</button>
+<button onclick="show('Signals')">◈<br>Signals</button>
+<button onclick="show('Calculator')">▦<br>Calculator</button>
+<button onclick="show('History')">◷<br>History</button>
+</nav>
+<script>
+function show(page){
+if(page==='Dashboard') location.reload();
+else alert(page+' will be added soon');
+}
+</script>
+</body>
+</html>
