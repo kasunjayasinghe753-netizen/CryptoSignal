@@ -157,9 +157,11 @@ function renderDashboard(signals = window.CRYPTOSIGNAL46_SIGNALS || [],
 
   const active = signals.filter(s => ["OPEN", "PENDING"].includes(String(s.status || "").toUpperCase()));
   const closed = history.length;
-  const outcomes = history.map(s => String(s.result || "").toUpperCase());
-  const wins = outcomes.filter(x => x === "WIN").length;
-  const losses = outcomes.filter(x => x === "LOSS").length;
+  const outcomes = history.map(s =>
+    `${s.result || ""} ${s.exitReason || ""}`.toUpperCase()
+  );
+  const wins = outcomes.filter(x => /\\bWIN\\b|TP[123]/.test(x)).length;
+  const losses = outcomes.filter(x => /\\bLOSS\\b|\\bSL\\b|STOP.?LOSS/.test(x)).length;
   const decided = wins + losses;
   const winRate = decided ? (wins / decided * 100).toFixed(1) + "%" : "--";
   const total = active.length + closed;
