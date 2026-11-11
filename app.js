@@ -9,7 +9,7 @@ function show(page) {
 
   if (page === "Calculator") {
     main.innerHTML = `
-      <h3>TP / SL Profit Calculator</h3>
+      <h3>TP / SL Management Calculator</h3>
 
       <div class="card">
         <label>Margin (USDT)</label>
@@ -85,74 +85,104 @@ function calculate() {
     return;
   }
 
-  if (side === "LONG" && !(sl < entry && entry < tp1 && tp1 < tp2 && tp2 < tp3)) {
-    alert("LONG: SL < Entry < TP1 < TP2 < TP3 විය යුතුයි.");
+  if (side === "LONG" &&
+      !(sl < entry && entry < tp1 && tp1 < tp2 && tp2 < tp3)) {
+    alert("LONG: SL < Entry < TP1 < TP2 < TP3");
     return;
   }
 
-  if (side === "SHORT" && !(sl > entry && entry > tp1 && tp1 > tp2 && tp2 > tp3)) {
-    alert("SHORT: SL > Entry > TP1 > TP2 > TP3 විය යුතුයි.");
+  if (side === "SHORT" &&
+      !(sl > entry && entry > tp1 && tp1 > tp2 && tp2 > tp3)) {
+    alert("SHORT: SL > Entry > TP1 > TP2 > TP3");
     return;
   }
 
   const position = margin * leverage;
   const quantity = position / entry;
 
-  function pnl(price) {
+  // TP1: Close 25%, keep 75%
+  const closePercent = 0.25;
+  const remainingPercent = 0.75;
+
+  function priceProfit(price, qty) {
     return side === "LONG"
-      ? quantity * (price - entry)
-      : quantity * (entry - price);
+      ? qty * (price - entry)
+      : qty * (entry - price);
   }
 
-  function roi(profit) {
-    return (profit / margin) * 100;
-  }
+  const closedQty = quantity * closePercent;
+  const remainingQty = quantity * remainingPercent;
 
-  const loss = Math.abs(pnl(sl));
-  const p1 = pnl(tp1);
-  const p2 = pnl(tp2);
-  const p3 = pnl(tp3);
+  const tp1PartialProfit = priceProfit(tp1, closedQty);
 
-  const riskReward1 = loss > 0 ? p1 / loss : 0;
-  const riskReward2 = loss > 0 ? p2 / loss : 0;
-  const riskReward3 = loss > 0 ? p3 / loss : 0;
+  const tp2Total =
+    tp1PartialProfit + priceProfit(tp2, remainingQty);
 
-  const money = n => n.toFixed(2);
-  const percent = n => n.toFixed(2) + "%";
-  const ratio = n => n.toFixed(2) + "R";
+  const tp3Total =
+    tp1PartialProfit + priceProfit(tp3, remainingQty);
+
+  // After TP1, SL moves to TP1 price
+  const protectedProfit =
+    tp1PartialProfit + priceProfit(tp1, remainingQty);
+
+  // Initial SL before TP1
+  const initialLoss = priceProfit(sl, quantity);
+
+  const fmt = n => n.toFixed(2);
+  const roi = n => (n / margin * 100).toFixed(2) + "%";
+  const rr = n => Math.abs(initialLoss) > 0
+    ? (n / Math.abs(initialLoss)).toFixed(2) + "R"
+    : "N/A";
+
+  const color = n => n >= 0 ? "green" : "red";
 
   document.getElementById("result").innerHTML = `
     <hr>
-    <h3>Calculation Results</h3>
-
-    <p>Position Size: ${money(position)} USDT</p>
+    <h3>Position Details</h3>
+    <p>Position Size: ${fmt(position)} USDT</p>
     <p>Quantity: ${quantity.toFixed(6)}</p>
 
     <hr>
-    <h3 class="green">TAKE PROFIT RESULTS</h3>
-
-    <p>TP1 Profit: <strong class="green">${money(p1)} USDT</strong></p>
-    <p>TP1 ROI: ${percent(roi(p1))}</p>
-    <p>TP1 Risk/Reward: ${ratio(riskReward1)}</p>
-
-    <hr>
-
-    <p>TP2 Profit: <strong class="green">${money(p2)} USDT</strong></p>
-    <p>TP2 ROI: ${percent(roi(p2))}</p>
-    <p>TP2 Risk/Reward: ${ratio(riskReward2)}</p>
+    <h3 class="green">TP1 MANAGEMENT</h3>
+    <p>TP1 Price: ${tp1}</p>
+    <p>Close: 25% (${closedQty.toFixed(6)})</p>
+    <p>TP1 Realized Profit:
+      <strong class="green">${fmt(tp1PartialProfit)} USDT</strong>
+    </p>
+    <p>Remaining Position: 75% (${remainingQty.toFixed(6)})</p>
+    <p>New Stop Loss: ${tp1}</p>
 
     <hr>
+    <h3>AFTER TP1 RESULTS</h3>
 
-    <p>TP3 Profit: <strong class="green">${money(p3)} USDT</strong></p>
-    <p>TP3 ROI: ${percent(roi(p3))}</p>
-    <p>TP3 Risk/Reward: ${ratio(riskReward3)}</p>
-
-    <hr>
-    <h3 class="red">STOP LOSS RESULT</h3>
-    <p>Estimated Loss: <strong class="red">-${money(loss)} USDT</strong></p>
-    <p>Loss ROI: <span class="red">-${percent(roi(loss))}</span></p>
+    <p>TP1 Hit → SL Hit at TP1:</p>
+    <strong class="green">${fmt(protectedProfit)} USDT</strong>
+    <p>ROI: ${roi(protectedProfit)}</p>
 
     <hr>
-    <small>Estimated results before trading fees and funding. Assumes the full position closes at each target separately. This is not a liquidation calculator.</small>
+    <p>TP2 Hit → Total Profit:</p>
+    <strong class="${color(tp2Total)}">${fmt(tp2Total)} USDT</strong>
+    <p>ROI: ${roi(tp2Total)}</p>
+    <p>Risk/Reward: ${rr(tp2Total)}</p>
+
+    <hr>
+    <p>TP3 Hit → Total Profit:</p>
+    <strong class="${color(tp3Total)}">${fmt(tp3Total)} USDT</strong>
+    <p>ROI: ${roi(tp3Total)}</p>
+    <p>Risk/Reward: ${rr(tp3Total)}</p>
+
+    <hr>
+    <h3 class="red">BEFORE TP1</h3>
+    <p>Initial Stop Loss: ${sl}</p>
+    <strong class="red">${fmt(initialLoss)} USDT</strong>
+    <p>ROI: ${roi(initialLoss)}</p>
+
+    <hr>
+    <small>
+      Assumes 25% closes at TP1 and remaining 75% closes
+      at TP2, TP3 or the moved SL at TP1.
+      Fees, funding and slippage are excluded.
+      Calculation only; it does not modify exchange orders.
+    </small>
   `;
 }
