@@ -2,6 +2,7 @@
 let signalFilter = "ALL";
 let activePage = "Dashboard";
 let trackingRefreshTimer = null;
+let trackingTimeframe = "15m";
 
 const API_BASE = "https://187.55.163.68";
 
@@ -369,7 +370,170 @@ async function loadDailyReport() {
 }
 
 
-async function loadLiveTracking() {
+
+function okxInstId(symbol) {
+  return String(symbol || "")
+    .replace("/USDT:USDT", "-USDT-SWAP")
+    .replace("/USDT", "-USDT")
+    .replace("/", "-");
+}
+
+async function loadOKXCandles(symbol, bar = trackingTimeframe) {
+  const instId = okxInstId(symbol);
+  const url = "https://www.okx.com/api/v5/market/candles?instId="
+    + encodeURIComponent(instId)
+    + "&bar=" + encodeURIComponent(bar)
+    + "&limit=60";
+
+  const response = await fetch(url);
+  if (!response.ok) throw new Error("OKX candles error: " + response.status);
+
+  const data = await response.json();
+  if (data.code !== "0" || !Array.isArray(data.data)) {
+    throw new Error("OKX candles unavailable");
+  }
+
+  return data.data.reverse().map(row => ({
+    ts: Number(row[0]),
+    open: Number(row[1]),
+    high: Number(row[2]),
+    low: Number(row[3]),
+    close: Number(row[4])
+  })).filter(c => [c.open,c.high,c.low,c.close].every(Number.isFinite));
+}
+
+function drawTrackingChart(canvas, candles, signal) {
+  if (!canvas || !candles.length) return;
+
+  const rect = canvas.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  const width = Math.max(300, Math.floor(rect.width));
+  const height = 260;
+
+  canvas.width = width * dpr;
+  canvas.height = height * dpr;
+  canvas.style.height = height + "px";
+
+  const ctx = canvas.getContext("2d");
+  ctx.scale(dpr, dpr);
+  ctx.clearRect(0, 0, width, height);
+
+  const pad = { left: 48, right: 12, top: 18, bottom: 28 };
+  const plotW = width - pad.left - pad.right;
+  const plotH = height - pad.top - pad.bottom;
+
+  const levels = [
+    { value: Number(signal.sl), label: "SL", cls: "sl" },
+    { value: Number(signal.entry ?? signal.entryLow), label: "ENTRY", cls: "entry" },
+    { value: Number(signal.tp1), label: "TP1", cls: "tp" },
+    { value: Number(signal.tp2), label: "TP2", cls: "tp" },
+    { value: Number(signal.tp3), label: "TP3", cls: "tp" }
+  ].filter(x => Number.isFinite(x.value));
+
+  const values = candles.flatMap(c => [c.high, c.low]).concat(levels.map(x => x.value));
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = Math.max(max - min, Math.abs(max) * 0.001, 0.000001);
+  const lo = min - range * 0.08;
+  const hi = max + range * 0.08;
+
+  const y = price => pad.top + ((hi - price) / (hi - lo)) * plotH;
+  const x = i => pad.left + (i + 0.5) * (plotW / candles.length);
+
+  ctx.fillStyle = "#0b1320";
+  ctx.fillRect(0, 0, width, height);
+
+  ctx.strokeStyle = "rgba(148,163,184,0.12)";
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 4; i++) {
+    const gy = pad.top + (plotH / 3) * i;
+    ctx.beginPath();
+    ctx.moveTo(pad.left, gy);
+    ctx.lineTo(width - pad.right, gy);
+    ctx.stroke();
+  }
+
+  ctx.font = "10px Arial";
+  ctx.fillStyle = "#8290a3";
+  for (let i = 0; i < 4; i++) {
+    const p = hi - ((hi - lo) / 3) * i;
+    ctx.fillText(p >= 1 ? p.toFixed(2) : p.toPrecision(4), 5, pad.top + (plotH / 3) * i + 4);
+  }
+
+  const candleW = Math.max(2, Math.min(10, (plotW / candles.length) * 0.62));
+
+  candles.forEach((c, i) => {
+    const cx = x(i);
+    const up = c.close >= c.open;
+    const bodyTop = y(Math.max(c.open, c.close));
+    const bodyBottom = y(Math.min(c.open, c.close));
+    const bodyH = Math.max(1.5, bodyBottom - bodyTop);
+
+    ctx.strokeStyle = up ? "#36e6a0" : "#ff6577";
+    ctx.fillStyle = up ? "#36e6a0" : "#ff6577";
+
+    ctx.beginPath();
+    ctx.moveTo(cx, y(c.high));
+    ctx.lineTo(cx, y(c.low));
+    ctx.stroke();
+
+    ctx.fillRect(cx - candleW / 2, bodyTop, candleW, bodyH);
+  });
+
+  levels.forEach(level => {
+    const yy = y(level.value);
+    ctx.setLineDash(level.cls === "entry" ? [5,4] : [3,4]);
+    ctx.strokeStyle = level.cls === "sl" ? "#ff6577" : level.cls === "entry" ? "#f5c542" : "#36e6a0";
+    ctx.lineWidth = level.cls === "entry" ? 1.5 : 1;
+    ctx.beginPath();
+    ctx.moveTo(pad.left, yy);
+    ctx.lineTo(width - pad.right, yy);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    ctx.fillStyle = ctx.strokeStyle;
+    ctx.font = "bold 9px Arial";
+    ctx.fillText(level.label, width - pad.right - 30, yy - 3);
+  });
+
+  const last = candles[candles.length - 1];
+  const currentY = y(last.close);
+  ctx.fillStyle = "#ffffff";
+  ctx.beginPath();
+  ctx.arc(x(candles.length - 1), currentY, 3, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = "#8290a3";
+  ctx.font = "10px Arial";
+  ctx.fillText(trackingTimeframe.toUpperCase(), pad.left, height - 9);
+  ctx.fillText("OKX", width - 36, height - 9);
+}
+
+async function renderTrackingCharts(active) {
+  await Promise.all(active.map(async signal => {
+    const canvas = document.getElementById("tracking-chart-" + signal.id);
+    if (!canvas) return;
+
+    try {
+      const candles = await loadOKXCandles(signal.symbol, trackingTimeframe);
+      drawTrackingChart(canvas, candles, signal);
+    } catch (error) {
+      console.error("Chart failed:", signal.symbol, error);
+      const ctx = canvas.getContext("2d");
+      const width = canvas.clientWidth || 300;
+      canvas.width = width;
+      canvas.height = 260;
+      ctx.fillStyle = "#0b1320";
+      ctx.fillRect(0, 0, width, 260);
+      ctx.fillStyle = "#8290a3";
+      ctx.font = "12px Arial";
+      ctx.fillText("Chart unavailable", 20, 35);
+    }
+  }));
+}
+
+async function loadLiveTracking(timeframe = trackingTimeframe) {
+  trackingTimeframe = timeframe;
   const main = document.querySelector("main");
   if (!main) return;
 
@@ -504,6 +668,18 @@ async function loadLiveTracking() {
               <strong class="${t.stateClass}">${dashboardEscape(t.label)}</strong>
             </div>
 
+            <div class="chart-card">
+              <div class="chart-top">
+                <strong>LIVE MARKET</strong>
+                <div class="chart-timeframes">
+                  <button class="${trackingTimeframe === "15m" ? "active" : ""}" onclick="loadLiveTracking('15m')">15M</button>
+                  <button class="${trackingTimeframe === "1H" ? "active" : ""}" onclick="loadLiveTracking('1H')">1H</button>
+                </div>
+              </div>
+              <canvas id="tracking-chart-${dashboardEscape(s.id)}" class="tracking-chart"></canvas>
+              <div class="chart-note">OKX candles • live market view</div>
+            </div>
+
             <div class="tracking-levels">
               <span>Entry <b>${dashboardEscape(fmt(s.entry ?? s.entryLow))}</b></span>
               <span>SL <b class="red">${dashboardEscape(fmt(s.sl))}</b></span>
@@ -536,9 +712,11 @@ async function loadLiveTracking() {
       `}
 
       <div class="card">
-        <small>Live prices are read from the CRYPTOSIGNAL46 VPS and OKX. This screen shows current price position; it does not place or modify orders.</small>
+        <small>Live prices and candles are read from OKX. This screen shows current market position; it does not place or modify orders.</small>
       </div>
     `;
+
+    await renderTrackingCharts(active);
 
   } catch (error) {
     console.error("Live tracking failed:", error);
