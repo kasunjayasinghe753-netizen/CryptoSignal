@@ -280,6 +280,93 @@ async function loadDashboardData() {
   }
 }
 
+
+async function loadDailyReport() {
+  const main = document.querySelector("main");
+  if (!main) return;
+
+  main.innerHTML = `
+    <div class="dashboard-heading">
+      <div>
+        <h3>Daily Report</h3>
+        <small>CRYPTOSIGNAL46 performance summary</small>
+      </div>
+      <span class="live-indicator">● LIVE</span>
+    </div>
+    <div class="card"><strong>Loading report...</strong></div>
+  `;
+
+  try {
+    const response = await fetch(`${API_BASE}/api/history`);
+    if (!response.ok) throw new Error("History API error: " + response.status);
+
+    const data = await response.json();
+    const rows = dashboardRows(data, ["signals", "history", "data"]).map(mapApiSignal);
+    window.CRYPTOSIGNAL46_HISTORY = rows;
+
+    const todayKey = new Date().toISOString().slice(0, 10);
+    const today = rows.filter(s => {
+      const raw = s.createdAt;
+      if (!raw) return false;
+      const d = new Date(raw);
+      return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === todayKey;
+    });
+
+    const wins = today.filter(s => String(s.result || "").toUpperCase() === "WIN").length;
+    const losses = today.filter(s => String(s.result || "").toUpperCase() === "LOSS").length;
+    const breakeven = today.filter(s => {
+      const r = String(s.result || "").toUpperCase();
+      return r === "BREAKEVEN" || r === "BE";
+    }).length;
+    const decided = wins + losses;
+    const winRate = decided ? (wins / decided * 100).toFixed(1) + "%" : "--";
+    const tp1 = today.filter(s => String(s.exitReason || "").toUpperCase().includes("TP1")).length;
+    const tp2 = today.filter(s => String(s.exitReason || "").toUpperCase().includes("TP2")).length;
+    const tp3 = today.filter(s => String(s.exitReason || "").toUpperCase().includes("TP3")).length;
+
+    main.innerHTML = `
+      <div class="dashboard-heading">
+        <div>
+          <h3>Daily Report</h3>
+          <small>${todayKey} • Closed signal performance</small>
+        </div>
+        <span class="live-indicator">● LIVE</span>
+      </div>
+
+      <div class="stats dashboard-stats">
+        <div class="card"><small>SIGNALS</small><div class="number">${today.length}</div></div>
+        <div class="card"><small>WIN RATE</small><div class="number green">${winRate}</div></div>
+        <div class="card"><small>WINS</small><div class="number green">${wins}</div></div>
+        <div class="card"><small>LOSSES</small><div class="number red">${losses}</div></div>
+      </div>
+
+      <div class="card">
+        <h3>TP / SL Results</h3>
+        <p>TP1: <strong class="green">${tp1}</strong></p>
+        <p>TP2: <strong class="green">${tp2}</strong></p>
+        <p>TP3: <strong class="green">${tp3}</strong></p>
+        <p>Breakeven: <strong>${breakeven}</strong></p>
+      </div>
+
+      <div class="card">
+        <h3>Summary</h3>
+        <p>Closed today: <strong>${today.length}</strong></p>
+        <p>Pending/other history rows: <strong>${Math.max(0, today.length - wins - losses - breakeven)}</strong></p>
+        <button class="refresh-button" onclick="loadDailyReport()">↻ Refresh Report</button>
+      </div>
+    `;
+  } catch (error) {
+    console.error("Daily report loading failed:", error);
+    main.innerHTML = `
+      <h3>Daily Report</h3>
+      <div class="card">
+        <strong>Could not load daily report.</strong>
+        <p><small>Please try again later.</small></p>
+      </div>
+    `;
+  }
+}
+
 function show(page) {
   activePage = page;
   const main = document.querySelector("main");
@@ -368,6 +455,11 @@ function show(page) {
     loadSignalHistory();
     return;
   }
+
+  if (page === "Report") {
+    loadDailyReport();
+    return;
+  }
 }
 
 function openSignalDetails(signalId) {
@@ -403,6 +495,13 @@ function openSignalDetails(signalId) {
       </div>
       <hr>
       <p>Signal ID: <strong>${dashboardEscape(signal.id)}</strong></p>
+      <p>Score: <strong>${dashboardEscape(signal.score ?? "-")}</strong></p>
+      <div class="card tp-plan">
+        <h3>TP / SL Management</h3>
+        <p>TP1 → secure 25% and move SL to TP1.</p>
+        <p>TP2 → keep remaining 75% open.</p>
+        <p>TP3 → final target for the remaining position.</p>
+      </div>
       <small>${dashboardEscape(signal.createdAt)}</small>
     </div>
     <button class="back-button" onclick="show('Dashboard')">← Back to Home</button>
