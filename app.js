@@ -327,12 +327,25 @@ async function loadDailyReport() {
     const rows = dashboardRows(data, ["signals", "history", "data"]).map(mapApiSignal);
     window.CRYPTOSIGNAL46_HISTORY = rows;
 
-    const todayKey = new Date().toISOString().slice(0, 10);
+    const todayKey = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Europe/Rome",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit"
+    }).format(new Date());
+
     const today = rows.filter(s => {
       const raw = s.createdAt;
       if (!raw) return false;
       const d = new Date(raw);
-      return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === todayKey;
+      if (Number.isNaN(d.getTime())) return false;
+      const signalDate = new Intl.DateTimeFormat("en-CA", {
+        timeZone: "Europe/Rome",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit"
+      }).format(d);
+      return signalDate === todayKey;
     });
 
     const wins = today.filter(s => String(s.result || "").toUpperCase() === "WIN").length;
