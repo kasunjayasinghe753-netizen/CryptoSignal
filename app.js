@@ -171,6 +171,37 @@ function formatPrice(value) {
   return x.toPrecision(5);
 }
 
+function calculateSignalPnL(signal) {
+  const entry = Number(signal.entry);
+  const close = Number(signal.closePrice);
+  const tp1 = Number(signal.tp1);
+  const side = String(signal.side || "").toUpperCase();
+  const stage = Number(signal.exitStage ?? signal.done ?? 0);
+
+  if (![entry, close].every(Number.isFinite) || !side) return null;
+
+  const move = price => side === "LONG" ? price - entry : entry - price;
+
+  // TP1 management: 25% closes at TP1, remaining 75% stays open.
+  if (stage >= 3 && Number.isFinite(tp1)) {
+    const tp3 = Number(signal.tp3);
+    if (!Number.isFinite(tp3)) return null;
+    return move(tp1) * 0.25 + move(tp3) * 0.75;
+  }
+
+  if (stage >= 1 && Number.isFinite(tp1)) {
+    return move(tp1) * 0.25 + move(close) * 0.75;
+  }
+
+  return move(close);
+}
+
+function formatUsdt(value) {
+  if (!Number.isFinite(Number(value))) return "-";
+  const n = Number(value);
+  return (n >= 0 ? "+" : "") + n.toFixed(2) + " USDT";
+}
+
 function renderDashboard(signals = window.CRYPTOSIGNAL46_SIGNALS || [],
                          history = window.CRYPTOSIGNAL46_HISTORY || []) {
   if (activePage !== "Dashboard") return;
@@ -360,6 +391,11 @@ async function loadDailyReport() {
     const tp2 = today.filter(s => Boolean(s.tp2At)).length;
     const tp3 = today.filter(s => Boolean(s.tp3At)).length;
 
+    const pnlRows = today.map(s => ({ signal: s, pnl: calculateSignalPnL(s) }))
+      .filter(x => x.pnl !== null);
+    const totalPnl = pnlRows.reduce((sum, x) => sum + x.pnl, 0);
+    const avgPnl = pnlRows.length ? totalPnl / pnlRows.length : 0;
+
     main.innerHTML = `
       <div class="dashboard-heading">
         <div>
@@ -374,6 +410,11 @@ async function loadDailyReport() {
         <div class="card"><small>WIN RATE</small><div class="number green">${winRate}</div></div>
         <div class="card"><small>WINS</small><div class="number green">${wins}</div></div>
         <div class="card"><small>LOSSES</small><div class="number red">${losses}</div></div>
+        <div class="card">
+          <small>NET P/L</small>
+          <div class="number ${totalPnl >= 0 ? "green" : "red"}">${formatUsdt(totalPnl)}</div>
+          <small>Avg: ${formatUsdt(avgPnl)}</small>
+        </div>
       </div>
 
       <div class="card">
@@ -387,7 +428,10 @@ async function loadDailyReport() {
       <div class="card">
         <h3>Summary</h3>
         <p>Closed today: <strong>${today.length}</strong></p>
+        <p>Calculated P/L: <strong class="${totalPnl >= 0 ? "green" : "red"}">${formatUsdt(totalPnl)}</strong></p>
+        <p>Signals with calculable P/L: <strong>${pnlRows.length}</strong></p>
         <p>Pending/other history rows: <strong>${Math.max(0, today.length - wins - losses - breakeven)}</strong></p>
+        <small>Uses the bot's TP1 25% management rule. Fees, funding and slippage are excluded.</small>
         <button class="refresh-button" onclick="loadDailyReport()">↻ Refresh Report</button>
       </div>
     `;
