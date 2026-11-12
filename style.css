@@ -349,3 +349,32 @@ button {
   font-size: 9px;
   text-align: right;
 }
+
+
+.tracking-hit-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0 4px;
+  font-size: 11px;
+  color: #9ba9ba;
+}
+
+.tracking-hit-status span {
+  padding: 5px 8px;
+  border: 1px solid #283444;
+  border-radius: 999px;
+}
+
+.tracking-hit-status .tracking-hit {
+  color: #36e6a0;
+  border-color: rgba(54,230,160,0.45);
+}
+
+.tracking-hit-status .tracking-target {
+  color: #36e6a0;
+}
+
+.tracking-hit-status .tracking-danger {
+  color: #ff6577;
+}
