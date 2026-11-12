@@ -332,12 +332,22 @@ function show(page) {
 
   if (page === "Signals") {
     main.innerHTML = `
-      <h3>CRYPTOSIGNAL46 Signals</h3>
+      <div class="dashboard-heading">
+        <div>
+          <h3>Active Signals</h3>
+          <small>Live OPEN / PENDING signals from CRYPTOSIGNAL46</small>
+        </div>
+        <span class="live-indicator">● LIVE</span>
+      </div>
 
-      <div class="card">
-        <p><strong>Signal Center</strong></p>
-        <p>Market: OKX USDT Perpetual</p>
-        <p id="signalCount">0 Signals</p>
+      <div class="card active-signal-summary">
+        <div class="active-signal-top">
+          <div>
+            <strong id="signalCount">0 Active Signals</strong>
+            <p class="muted">Market: OKX USDT Perpetual</p>
+          </div>
+          <button class="refresh-button" onclick="loadCryptoSignals()">↻ Refresh</button>
+        </div>
 
         <div class="signal-filters">
           <button onclick="setSignalFilter('ALL')">ALL</button>
@@ -350,7 +360,6 @@ function show(page) {
     `;
 
     renderSignals(window.CRYPTOSIGNAL46_SIGNALS || []);
-
     loadCryptoSignals();
     return;
   }
