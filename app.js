@@ -367,6 +367,70 @@ async function loadDailyReport() {
   }
 }
 
+
+async function loadLiveTracking() {
+  const main = document.querySelector("main");
+  if (!main) return;
+  main.innerHTML = `
+    <div class="dashboard-heading">
+      <div><h3>Live TP / SL Tracking</h3><small>Current signal status from CRYPTOSIGNAL46</small></div>
+      <span class="live-indicator">● LIVE</span>
+    </div>
+    <div class="card"><strong>Loading live tracking...</strong></div>
+  `;
+  try {
+    const response = await fetch(`${API_BASE}/api/signals`);
+    if (!response.ok) throw new Error("Signals API error: " + response.status);
+    const data = await response.json();
+    const rows = dashboardRows(data, ["signals","data"]).map(mapApiSignal);
+    window.CRYPTOSIGNAL46_SIGNALS = rows;
+    const active = rows.filter(s => ["OPEN","PENDING"].includes(String(s.status || "").toUpperCase()));
+    main.innerHTML = `
+      <div class="dashboard-heading">
+        <div><h3>Live TP / SL Tracking</h3><small>${active.length} active signals</small></div>
+        <span class="live-indicator">● LIVE</span>
+      </div>
+      ${active.length ? active.map(s => {
+        const entry = Number(s.entry ?? s.entryLow);
+        const tp1 = Number(s.tp1), tp2 = Number(s.tp2), tp3 = Number(s.tp3), sl = Number(s.sl);
+        const target = s.side === "LONG" ? tp3 : tp3;
+        const valid = [entry,tp1,tp2,tp3,sl].every(Number.isFinite);
+        return `
+          <div class="card signal-card">
+            <div class="signal">
+              <h3 class="${s.side === "LONG" ? "green" : "red"}">${dashboardEscape(s.side)} - ${dashboardEscape(s.symbol)}</h3>
+              <span class="tag">${dashboardEscape(s.status || "PENDING")}</span>
+            </div>
+            <p>Entry: <strong>${dashboardEscape(s.entry ?? "-")}</strong></p>
+            <p>SL: <strong class="red">${dashboardEscape(s.sl ?? "-")}</strong></p>
+            <div class="dashboard-levels">
+              <span>TP1 <b class="green">${dashboardEscape(s.tp1)}</b></span>
+              <span>TP2 <b class="green">${dashboardEscape(s.tp2)}</b></span>
+              <span>TP3 <b class="green">${dashboardEscape(s.tp3)}</b></span>
+            </div>
+            ${valid ? `
+              <div class="tracking-bar">
+                <div class="tracking-label"><span>Entry</span><span>TP3</span></div>
+                <div class="tracking-track"><div class="tracking-fill"></div></div>
+                <small>Live price is not supplied by the current signals API yet.</small>
+              </div>
+            ` : `
+              <small>Waiting for complete price levels.</small>
+            `}
+            <button class="refresh-button" onclick="openSignalDetails('${dashboardEscape(s.id)}')">Open Details</button>
+          </div>
+        `;
+      }).join("") : `
+        <div class="card"><strong>No active signals</strong><p>Waiting for new signals.</p></div>
+      `}
+      <div class="card"><small>Tracking refreshes from the VPS signal feed. Exact live-price progress will activate when the API exposes current market price.</small></div>
+    `;
+  } catch (error) {
+    console.error("Live tracking failed:", error);
+    main.innerHTML = `<div class="card"><strong>Could not load live tracking.</strong><p><small>Try again later.</small></p></div>`;
+  }
+}
+
 function show(page) {
   activePage = page;
   const main = document.querySelector("main");
@@ -458,6 +522,11 @@ function show(page) {
 
   if (page === "Report") {
     loadDailyReport();
+    return;
+  }
+
+  if (page === "Tracking") {
+    loadLiveTracking();
     return;
   }
 }
