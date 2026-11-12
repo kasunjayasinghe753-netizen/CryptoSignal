@@ -218,3 +218,15 @@ button {
   background: #3b2028;
   color: #ff6577;
 }
+
+
+/* Active Signals screen */
+.active-signal-summary { border: 1px solid #26364a; }
+.active-signal-top { display:flex; justify-content:space-between; align-items:center; gap:12px; }
+.active-signal-top p { margin:6px 0 0; }
+.muted { color:#9ba9ba; font-size:12px; }
+.refresh-button { width:auto !important; padding:10px 14px !important; background:#123b2e !important; color:#36e6a0 !important; }
+.signal-filters { display:flex; gap:8px; margin-top:14px; }
+.signal-filters button { flex:1; padding:10px 8px; border:1px solid #344357; border-radius:9px; background:#080d16; color:#9ba9ba; font-weight:bold; }
+.signal-card { border:1px solid #26364a; }
+@media (max-width:420px) { .active-signal-top { align-items:flex-start; } .refresh-button { padding:9px 10px !important; } }
