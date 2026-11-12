@@ -212,7 +212,7 @@ function renderDashboard(signals = window.CRYPTOSIGNAL46_SIGNALS || [],
           : "-"
       );
       return `
-        <div class="card dashboard-signal-card" onclick="openSignalDetails(${Number(signal.id || 0)})" role="button" tabindex="0">
+        <div class="card dashboard-signal-card" data-signal-id="${dashboardEscape(signal.id)}" role="button" tabindex="0">
           <div class="signal">
             <strong>${dashboardEscape(signal.symbol)}</strong>
             <span class="tag ${side === "SHORT" ? "short-tag" : ""}">${dashboardEscape(side)}</span>
@@ -593,6 +593,24 @@ function calculate() {
     </small>
   `;
 }
+
+// Handle Home signal-card taps with event delegation.
+// This avoids relying on inline onclick handlers, which can be blocked by browser/CSP rules.
+document.addEventListener("click", event => {
+  const card = event.target.closest(".dashboard-signal-card");
+  if (!card) return;
+  const signalId = card.getAttribute("data-signal-id");
+  if (signalId) openSignalDetails(signalId);
+});
+
+document.addEventListener("keydown", event => {
+  if (event.key !== "Enter" && event.key !== " ") return;
+  const card = event.target.closest(".dashboard-signal-card");
+  if (!card) return;
+  event.preventDefault();
+  const signalId = card.getAttribute("data-signal-id");
+  if (signalId) openSignalDetails(signalId);
+});
 
 // Load the live dashboard when the app opens and refresh it every 30 seconds.
 window.addEventListener("load", () => {
