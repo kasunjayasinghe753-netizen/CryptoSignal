@@ -235,3 +235,9 @@ button {
 /* Clickable Active Signals dashboard card */
 .dashboard-active-card { cursor: pointer; border: 1px solid #26364a; }
 .dashboard-active-card:active { transform: scale(0.99); }
+
+
+.tracking-bar { margin-top: 15px; }
+.tracking-label { display:flex; justify-content:space-between; color:#9ba9ba; font-size:11px; margin-bottom:6px; }
+.tracking-track { height:10px; border-radius:999px; background:#283444; overflow:hidden; }
+.tracking-fill { width:0%; height:100%; background:#36e6a0; border-radius:999px; }
