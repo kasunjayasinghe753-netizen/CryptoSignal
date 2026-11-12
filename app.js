@@ -26,6 +26,14 @@ function mapApiSignal(s) {
     createdAt: s.created_at ?? s.createdAt,
     result: s.result,
     exitReason: s.exit_reason ?? s.exitReason,
+    exitStage: s.exit_stage ?? s.exitStage,
+    closePrice: s.close_price ?? s.closePrice,
+    activatedAt: s.activated_at ?? s.activatedAt,
+    closedAt: s.closed_at ?? s.closedAt,
+    tp1At: s.tp1_at ?? s.tp1At,
+    tp2At: s.tp2_at ?? s.tp2At,
+    tp3At: s.tp3_at ?? s.tp3At,
+    done: s.done,
     score: s.score
   };
 }
@@ -116,7 +124,12 @@ async function loadSignalHistory() {
           <hr>
 
           <p>Status: <strong>${signal.status || "CLOSED"}</strong></p>
-          <small>${signal.createdAt || ""}</small>
+          <p>Result: <strong class="${String(signal.result || "").toUpperCase() === "LOSS" ? "red" : "green"}">${signal.result || "-"}</strong></p>
+          ${signal.tp1At ? `<p>🎯 TP1 HIT: <strong>${signal.tp1At}</strong></p>` : ""}
+          ${signal.tp2At ? `<p>🎯 TP2 HIT: <strong>${signal.tp2At}</strong></p>` : ""}
+          ${signal.tp3At ? `<p>🎯 TP3 HIT: <strong>${signal.tp3At}</strong></p>` : ""}
+          ${signal.exitReason ? `<p>Exit: <strong>${signal.exitReason}</strong>${signal.closePrice != null ? ` @ ${signal.closePrice}` : ""}</p>` : ""}
+          <small>Created: ${signal.createdAt || ""}${signal.closedAt ? ` • Closed: ${signal.closedAt}` : ""}</small>
 
         </div>
       `).join("")}
@@ -322,9 +335,9 @@ async function loadDailyReport() {
     }).length;
     const decided = wins + losses;
     const winRate = decided ? (wins / decided * 100).toFixed(1) + "%" : "--";
-    const tp1 = today.filter(s => String(s.exitReason || "").toUpperCase().includes("TP1")).length;
-    const tp2 = today.filter(s => String(s.exitReason || "").toUpperCase().includes("TP2")).length;
-    const tp3 = today.filter(s => String(s.exitReason || "").toUpperCase().includes("TP3")).length;
+    const tp1 = today.filter(s => Boolean(s.tp1At)).length;
+    const tp2 = today.filter(s => Boolean(s.tp2At)).length;
+    const tp3 = today.filter(s => Boolean(s.tp3At)).length;
 
     main.innerHTML = `
       <div class="dashboard-heading">
@@ -500,7 +513,7 @@ function drawTrackingChart(canvas, candles, signal) {
   const currentY = y(last.close);
 
   // Live price marker
-  const liveLabel = fmt(last.close);
+  const liveLabel = chartFmt(last.close);
   ctx.strokeStyle = "#ffffff";
   ctx.setLineDash([2, 3]);
   ctx.lineWidth = 1;
@@ -591,6 +604,14 @@ async function loadLiveTracking(timeframe = trackingTimeframe) {
     }
 
     function fmt(v) {
+      const x = n(v);
+      if (x === null) return "-";
+      if (Math.abs(x) >= 1000) return x.toFixed(2);
+      if (Math.abs(x) >= 1) return x.toFixed(4);
+      return x.toPrecision(5);
+    }
+
+    function chartFmt(v) {
       const x = n(v);
       if (x === null) return "-";
       if (Math.abs(x) >= 1000) return x.toFixed(2);
@@ -698,9 +719,16 @@ async function loadLiveTracking(timeframe = trackingTimeframe) {
             <div class="tracking-levels">
               <span>Entry <b>${dashboardEscape(fmt(s.entry ?? s.entryLow))}</b></span>
               <span>SL <b class="red">${dashboardEscape(fmt(s.sl))}</b></span>
-              <span>TP1 <b class="green">${dashboardEscape(fmt(s.tp1))}</b></span>
-              <span>TP2 <b class="green">${dashboardEscape(fmt(s.tp2))}</b></span>
-              <span>TP3 <b class="green">${dashboardEscape(fmt(s.tp3))}</b></span>
+              <span>TP1 <b class="green">${dashboardEscape(fmt(s.tp1))}</b>${s.tp1At ? ` <small class="green">✓ ${dashboardEscape(s.tp1At)}</small>` : ""}</span>
+              <span>TP2 <b class="green">${dashboardEscape(fmt(s.tp2))}</b>${s.tp2At ? ` <small class="green">✓ ${dashboardEscape(s.tp2At)}</small>` : ""}</span>
+              <span>TP3 <b class="green">${dashboardEscape(fmt(s.tp3))}</b>${s.tp3At ? ` <small class="green">✓ ${dashboardEscape(s.tp3At)}</small>` : ""}</span>
+            </div>
+
+            <div class="tracking-hit-status">
+              ${s.tp1At ? `<span class="tracking-hit">✓ TP1 HIT</span>` : `<span>TP1 pending</span>`}
+              ${s.tp2At ? `<span class="tracking-hit">✓ TP2 HIT</span>` : `<span>TP2 pending</span>`}
+              ${s.tp3At ? `<span class="tracking-hit">✓ TP3 HIT</span>` : `<span>TP3 pending</span>`}
+              ${s.result ? `<span class="${String(s.result).toUpperCase() === "LOSS" ? "tracking-danger" : "tracking-target"}">${dashboardEscape(s.result)}</span>` : ""}
             </div>
 
             <div class="tracking-bar">
@@ -874,6 +902,7 @@ function openSignalDetails(signalId) {
       </div>
       <p>Entry Type: <strong>${dashboardEscape(signal.entryType)}</strong></p>
       <p>Entry / Zone: <strong>${dashboardEscape(entry)}</strong></p>
+      <p>Result: <strong class="${String(signal.result || "").toUpperCase() === "LOSS" ? "red" : "green"}">${dashboardEscape(signal.result || "OPEN")}</strong></p>
       <div class="dashboard-levels">
         <span>SL <b class="red">${dashboardEscape(signal.sl)}</b></span>
         <span>TP1 <b class="green">${dashboardEscape(signal.tp1)}</b></span>
@@ -883,6 +912,13 @@ function openSignalDetails(signalId) {
       <hr>
       <p>Signal ID: <strong>${dashboardEscape(signal.id)}</strong></p>
       <p>Score: <strong>${dashboardEscape(signal.score ?? "-")}</strong></p>
+      <div class="card tp-plan">
+        <h3>Recorded TP / SL Events</h3>
+        <p>${signal.tp1At ? `✓ TP1 HIT — ${dashboardEscape(signal.tp1At)}` : "○ TP1 pending"}</p>
+        <p>${signal.tp2At ? `✓ TP2 HIT — ${dashboardEscape(signal.tp2At)}` : "○ TP2 pending"}</p>
+        <p>${signal.tp3At ? `✓ TP3 HIT — ${dashboardEscape(signal.tp3At)}` : "○ TP3 pending"}</p>
+        ${signal.exitReason ? `<p>Exit: <strong>${dashboardEscape(signal.exitReason)}</strong>${signal.closePrice != null ? ` @ ${dashboardEscape(fmt(signal.closePrice))}` : ""}</p>` : ""}
+      </div>
       <div class="card tp-plan">
         <h3>TP / SL Management</h3>
         <p>TP1 → secure 25% and move SL to TP1.</p>
