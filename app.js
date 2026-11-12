@@ -183,7 +183,7 @@ function renderDashboard(signals = window.CRYPTOSIGNAL46_SIGNALS || [],
         <small>TOTAL SIGNALS</small>
         <div class="number">${total}</div>
       </div>
-      <div class="card">
+      <div class="card dashboard-active-card" onclick="show('Signals')" role="button" tabindex="0" aria-label="Open active signals">
         <small>ACTIVE SIGNALS</small>
         <div class="number green">${active.length}</div>
       </div>
