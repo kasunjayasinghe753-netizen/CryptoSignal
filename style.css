@@ -289,3 +289,63 @@ button {
 .tracking-target {
   color: #36e6a0 !important;
 }
+
+
+/* Live candlestick market chart */
+.chart-card {
+  margin-top: 14px;
+  padding: 12px;
+  border: 1px solid #26364a;
+  border-radius: 14px;
+  background: #0a111c;
+  overflow: hidden;
+}
+
+.chart-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.chart-top strong {
+  font-size: 12px;
+  letter-spacing: .4px;
+}
+
+.chart-timeframes {
+  display: flex;
+  gap: 5px;
+}
+
+.chart-timeframes button {
+  width: auto !important;
+  padding: 7px 10px !important;
+  border: 1px solid #344357 !important;
+  border-radius: 7px !important;
+  background: #111b29 !important;
+  color: #9ba9ba !important;
+  font-size: 10px;
+  font-weight: bold;
+}
+
+.chart-timeframes button.active {
+  background: #123b2e !important;
+  color: #36e6a0 !important;
+  border-color: #36e6a0 !important;
+}
+
+.tracking-chart {
+  display: block;
+  width: 100%;
+  height: 260px;
+  border-radius: 10px;
+}
+
+.chart-note {
+  margin-top: 6px;
+  color: #68778b;
+  font-size: 9px;
+  text-align: right;
+}
