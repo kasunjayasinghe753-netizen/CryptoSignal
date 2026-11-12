@@ -241,3 +241,51 @@ button {
 .tracking-label { display:flex; justify-content:space-between; color:#9ba9ba; font-size:11px; margin-bottom:6px; }
 .tracking-track { height:10px; border-radius:999px; background:#283444; overflow:hidden; }
 .tracking-fill { width:0%; height:100%; background:#36e6a0; border-radius:999px; }
+
+
+/* Live price TP / SL tracking */
+.live-price-box {
+  margin-top: 15px;
+  padding: 14px;
+  border: 1px solid #26364a;
+  border-radius: 12px;
+  background: #0d1521;
+}
+.live-price {
+  font-size: 26px;
+  font-weight: bold;
+  margin: 5px 0 4px;
+}
+.tracking-levels {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+  font-size: 12px;
+}
+.tracking-levels span {
+  display: flex;
+  justify-content: space-between;
+  gap: 5px;
+  padding: 7px 8px;
+  background: #0d1521;
+  border-radius: 8px;
+}
+.tracking-percent {
+  margin-top: 6px;
+  text-align: right;
+  color: #9ba9ba;
+  font-size: 11px;
+}
+.tracking-fill.tracking-danger {
+  background: #ff6577;
+}
+.tracking-fill.tracking-target {
+  background: #36e6a0;
+}
+.tracking-danger {
+  color: #ff6577 !important;
+}
+.tracking-target {
+  color: #36e6a0 !important;
+}
