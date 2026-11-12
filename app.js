@@ -498,6 +498,21 @@ function drawTrackingChart(canvas, candles, signal) {
 
   const last = candles[candles.length - 1];
   const currentY = y(last.close);
+
+  // Live price marker
+  const liveLabel = fmt(last.close);
+  ctx.strokeStyle = "#ffffff";
+  ctx.setLineDash([2, 3]);
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(pad.left, currentY);
+  ctx.lineTo(width - pad.right, currentY);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "bold 9px Arial";
+  ctx.fillText("LIVE " + liveLabel, 5, Math.max(12, currentY - 4));
+
   ctx.fillStyle = "#ffffff";
   ctx.beginPath();
   ctx.arc(x(candles.length - 1), currentY, 3, 0, Math.PI * 2);
@@ -670,14 +685,14 @@ async function loadLiveTracking(timeframe = trackingTimeframe) {
 
             <div class="chart-card">
               <div class="chart-top">
-                <strong>LIVE MARKET</strong>
+                <strong>${dashboardEscape(s.side)} MARKET</strong>
                 <div class="chart-timeframes">
                   <button class="${trackingTimeframe === "15m" ? "active" : ""}" onclick="loadLiveTracking('15m')">15M</button>
                   <button class="${trackingTimeframe === "1H" ? "active" : ""}" onclick="loadLiveTracking('1H')">1H</button>
                 </div>
               </div>
               <canvas id="tracking-chart-${dashboardEscape(s.id)}" class="tracking-chart"></canvas>
-              <div class="chart-note">OKX candles • live market view</div>
+              <div class="chart-note">OKX candles • ${dashboardEscape(t.label)} • live market view</div>
             </div>
 
             <div class="tracking-levels">
