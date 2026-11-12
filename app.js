@@ -163,6 +163,14 @@ function dashboardEscape(value) {
   })[ch]);
 }
 
+function formatPrice(value) {
+  const x = Number(value);
+  if (!Number.isFinite(x)) return "-";
+  if (Math.abs(x) >= 1000) return x.toFixed(2);
+  if (Math.abs(x) >= 1) return x.toFixed(4);
+  return x.toPrecision(5);
+}
+
 function renderDashboard(signals = window.CRYPTOSIGNAL46_SIGNALS || [],
                          history = window.CRYPTOSIGNAL46_HISTORY || []) {
   if (activePage !== "Dashboard") return;
@@ -917,7 +925,7 @@ function openSignalDetails(signalId) {
         <p>${signal.tp1At ? `✓ TP1 HIT — ${dashboardEscape(signal.tp1At)}` : "○ TP1 pending"}</p>
         <p>${signal.tp2At ? `✓ TP2 HIT — ${dashboardEscape(signal.tp2At)}` : "○ TP2 pending"}</p>
         <p>${signal.tp3At ? `✓ TP3 HIT — ${dashboardEscape(signal.tp3At)}` : "○ TP3 pending"}</p>
-        ${signal.exitReason ? `<p>Exit: <strong>${dashboardEscape(signal.exitReason)}</strong>${signal.closePrice != null ? ` @ ${dashboardEscape(fmt(signal.closePrice))}` : ""}</p>` : ""}
+        ${signal.exitReason ? `<p>Exit: <strong>${dashboardEscape(signal.exitReason)}</strong>${signal.closePrice != null ? ` @ ${dashboardEscape(formatPrice(signal.closePrice))}` : ""}</p>` : ""}
       </div>
       <div class="card tp-plan">
         <h3>TP / SL Management</h3>
