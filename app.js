@@ -1,6 +1,7 @@
 
 let signalFilter = "ALL";
 let activePage = "Dashboard";
+let trackingRefreshTimer = null;
 
 const API_BASE = "https://187.55.163.68";
 
@@ -647,6 +648,10 @@ function show(page) {
 
   if (page === "Tracking") {
     loadLiveTracking();
+    if (trackingRefreshTimer) clearInterval(trackingRefreshTimer);
+    trackingRefreshTimer = setInterval(() => {
+      if (activePage === "Tracking") loadLiveTracking();
+    }, 15000);
     return;
   }
 }
