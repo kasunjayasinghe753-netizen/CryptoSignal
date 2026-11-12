@@ -396,6 +396,8 @@ async function loadDailyReport() {
     const totalPnl = pnlRows.reduce((sum, x) => sum + x.pnl, 0);
     const avgPnl = pnlRows.length ? totalPnl / pnlRows.length : 0;
 
+    const pnlBreakdown = pnlRows.slice().sort((a, b) => Number(b.signal.id || 0) - Number(a.signal.id || 0));
+
     main.innerHTML = `
       <div class="dashboard-heading">
         <div>
@@ -423,6 +425,25 @@ async function loadDailyReport() {
         <p>TP2: <strong class="green">${tp2}</strong></p>
         <p>TP3: <strong class="green">${tp3}</strong></p>
         <p>Breakeven: <strong>${breakeven}</strong></p>
+      </div>
+
+      <div class="card">
+        <h3>Signal P/L Breakdown</h3>
+        ${pnlBreakdown.length ? pnlBreakdown.map(x => {
+          const s = x.signal;
+          const value = x.pnl;
+          const cls = value >= 0 ? "green" : "red";
+          return `
+            <div class="dashboard-signal-meta" style="margin-bottom:10px;">
+              <span>
+                <strong>#${dashboardEscape(s.id)}</strong>
+                ${dashboardEscape(s.symbol)}
+                <small>• ${dashboardEscape(s.side)}</small>
+              </span>
+              <strong class="${cls}">${formatUsdt(value)}</strong>
+            </div>
+          `;
+        }).join("") : "<p>No closed signals with calculable P/L yet.</p>"}
       </div>
 
       <div class="card">
