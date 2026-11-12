@@ -212,7 +212,7 @@ function renderDashboard(signals = window.CRYPTOSIGNAL46_SIGNALS || [],
           : "-"
       );
       return `
-        <div class="card dashboard-signal-card">
+        <div class="card dashboard-signal-card" onclick="openSignalDetails(${Number(signal.id || 0)})" role="button" tabindex="0">
           <div class="signal">
             <strong>${dashboardEscape(signal.symbol)}</strong>
             <span class="tag ${side === "SHORT" ? "short-tag" : ""}">${dashboardEscape(side)}</span>
@@ -370,6 +370,44 @@ function show(page) {
   }
 }
 
+function openSignalDetails(signalId) {
+  const signal = (window.CRYPTOSIGNAL46_SIGNALS || []).find(s => String(s.id) === String(signalId));
+  if (!signal) return;
+
+  activePage = "Signals";
+  const main = document.querySelector("main");
+  if (!main) return;
+
+  const side = String(signal.side || "").toUpperCase();
+  const sideClass = side === "LONG" ? "green" : "red";
+  const status = String(signal.status || "PENDING").toUpperCase();
+  const entry = signal.entry != null ? signal.entry : `${signal.entryLow ?? "-"} - ${signal.entryHigh ?? "-"}`;
+
+  main.innerHTML = `
+    <div class="dashboard-heading">
+      <div><h3>Signal Details</h3><small>CRYPTOSIGNAL46 Active Signal</small></div>
+      <span class="live-indicator">● LIVE</span>
+    </div>
+    <div class="card signal-card signal-detail-card">
+      <div class="signal">
+        <h3 class="${sideClass}">${dashboardEscape(side)} - ${dashboardEscape(signal.symbol)}</h3>
+        <span class="tag ${side === "SHORT" ? "short-tag" : ""}">${dashboardEscape(status)}</span>
+      </div>
+      <p>Entry Type: <strong>${dashboardEscape(signal.entryType)}</strong></p>
+      <p>Entry / Zone: <strong>${dashboardEscape(entry)}</strong></p>
+      <div class="dashboard-levels">
+        <span>SL <b class="red">${dashboardEscape(signal.sl)}</b></span>
+        <span>TP1 <b class="green">${dashboardEscape(signal.tp1)}</b></span>
+        <span>TP2 <b class="green">${dashboardEscape(signal.tp2)}</b></span>
+        <span>TP3 <b class="green">${dashboardEscape(signal.tp3)}</b></span>
+      </div>
+      <hr>
+      <p>Signal ID: <strong>${dashboardEscape(signal.id)}</strong></p>
+      <small>${dashboardEscape(signal.createdAt)}</small>
+    </div>
+    <button class="back-button" onclick="show('Dashboard')">← Back to Home</button>
+  `;
+}
 function setSignalFilter(filter) {
   signalFilter = filter;
   renderSignals(window.CRYPTOSIGNAL46_SIGNALS || []);
