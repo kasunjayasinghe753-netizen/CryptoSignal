@@ -371,63 +371,183 @@ async function loadDailyReport() {
 async function loadLiveTracking() {
   const main = document.querySelector("main");
   if (!main) return;
+
   main.innerHTML = `
     <div class="dashboard-heading">
-      <div><h3>Live TP / SL Tracking</h3><small>Current signal status from CRYPTOSIGNAL46</small></div>
+      <div>
+        <h3>Live TP / SL Tracking</h3>
+        <small>Current OKX price vs Entry / TP / SL</small>
+      </div>
       <span class="live-indicator">● LIVE</span>
     </div>
     <div class="card"><strong>Loading live tracking...</strong></div>
   `;
+
   try {
-    const response = await fetch(`${API_BASE}/api/signals`);
-    if (!response.ok) throw new Error("Signals API error: " + response.status);
-    const data = await response.json();
-    const rows = dashboardRows(data, ["signals","data"]).map(mapApiSignal);
+    const [signalsResponse, pricesResponse] = await Promise.all([
+      fetch(`${API_BASE}/api/signals`),
+      fetch(`${API_BASE}/api/prices`)
+    ]);
+
+    if (!signalsResponse.ok) throw new Error("Signals API error: " + signalsResponse.status);
+    if (!pricesResponse.ok) throw new Error("Prices API error: " + pricesResponse.status);
+
+    const [signalsData, pricesData] = await Promise.all([
+      signalsResponse.json(),
+      pricesResponse.json()
+    ]);
+
+    const rows = dashboardRows(signalsData, ["signals", "data"]).map(mapApiSignal);
+    const prices = pricesData.prices || {};
     window.CRYPTOSIGNAL46_SIGNALS = rows;
-    const active = rows.filter(s => ["OPEN","PENDING"].includes(String(s.status || "").toUpperCase()));
+
+    const active = rows.filter(s =>
+      ["OPEN", "PENDING"].includes(String(s.status || "").toUpperCase())
+    );
+
+    function n(v) {
+      const x = Number(v);
+      return Number.isFinite(x) ? x : null;
+    }
+
+    function fmt(v) {
+      const x = n(v);
+      if (x === null) return "-";
+      if (Math.abs(x) >= 1000) return x.toFixed(2);
+      if (Math.abs(x) >= 1) return x.toFixed(4);
+      return x.toPrecision(5);
+    }
+
+    function tracking(s) {
+      const current = n(prices[s.symbol]?.price);
+      const entry = n(s.entry ?? s.entryLow);
+      const tp1 = n(s.tp1);
+      const tp2 = n(s.tp2);
+      const tp3 = n(s.tp3);
+      const sl = n(s.sl);
+      const side = String(s.side || "").toUpperCase();
+
+      if (current === null) {
+        return { current: "-", progress: 0, label: "Price unavailable", stateClass: "" };
+      }
+
+      let progress = 0;
+      let label = "Tracking";
+      let stateClass = "";
+
+      if (side === "LONG" && entry !== null && tp3 !== null && tp3 !== entry) {
+        progress = ((current - entry) / (tp3 - entry)) * 100;
+        if (sl !== null && current <= sl) {
+          label = "At / through SL";
+          stateClass = "tracking-danger";
+        } else if (tp3 !== null && current >= tp3) {
+          label = "At / through TP3";
+          stateClass = "tracking-target";
+        } else if (tp2 !== null && current >= tp2) {
+          label = "At / through TP2";
+          stateClass = "tracking-target";
+        } else if (tp1 !== null && current >= tp1) {
+          label = "At / through TP1";
+          stateClass = "tracking-target";
+        } else {
+          label = current >= entry ? "Above Entry" : "Below Entry";
+        }
+      } else if (side === "SHORT" && entry !== null && tp3 !== null && tp3 !== entry) {
+        progress = ((entry - current) / (entry - tp3)) * 100;
+        if (sl !== null && current >= sl) {
+          label = "At / through SL";
+          stateClass = "tracking-danger";
+        } else if (current <= tp3) {
+          label = "At / through TP3";
+          stateClass = "tracking-target";
+        } else if (tp2 !== null && current <= tp2) {
+          label = "At / through TP2";
+          stateClass = "tracking-target";
+        } else if (tp1 !== null && current <= tp1) {
+          label = "At / through TP1";
+          stateClass = "tracking-target";
+        } else {
+          label = current <= entry ? "Below Entry" : "Above Entry";
+        }
+      }
+
+      progress = Math.max(0, Math.min(100, progress));
+      return { current: fmt(current), progress, label, stateClass };
+    }
+
     main.innerHTML = `
       <div class="dashboard-heading">
-        <div><h3>Live TP / SL Tracking</h3><small>${active.length} active signals</small></div>
+        <div>
+          <h3>Live TP / SL Tracking</h3>
+          <small>${active.length} active signals • OKX live price</small>
+        </div>
         <span class="live-indicator">● LIVE</span>
       </div>
+
       ${active.length ? active.map(s => {
-        const entry = Number(s.entry ?? s.entryLow);
-        const tp1 = Number(s.tp1), tp2 = Number(s.tp2), tp3 = Number(s.tp3), sl = Number(s.sl);
-        const target = s.side === "LONG" ? tp3 : tp3;
-        const valid = [entry,tp1,tp2,tp3,sl].every(Number.isFinite);
+        const t = tracking(s);
         return `
           <div class="card signal-card">
             <div class="signal">
-              <h3 class="${s.side === "LONG" ? "green" : "red"}">${dashboardEscape(s.side)} - ${dashboardEscape(s.symbol)}</h3>
-              <span class="tag">${dashboardEscape(s.status || "PENDING")}</span>
+              <h3 class="${s.side === "LONG" ? "green" : "red"}">
+                ${dashboardEscape(s.side)} - ${dashboardEscape(s.symbol)}
+              </h3>
+              <span class="tag ${s.side === "SHORT" ? "short-tag" : ""}">
+                ${dashboardEscape(s.status || "PENDING")}
+              </span>
             </div>
-            <p>Entry: <strong>${dashboardEscape(s.entry ?? "-")}</strong></p>
-            <p>SL: <strong class="red">${dashboardEscape(s.sl ?? "-")}</strong></p>
-            <div class="dashboard-levels">
-              <span>TP1 <b class="green">${dashboardEscape(s.tp1)}</b></span>
-              <span>TP2 <b class="green">${dashboardEscape(s.tp2)}</b></span>
-              <span>TP3 <b class="green">${dashboardEscape(s.tp3)}</b></span>
+
+            <div class="live-price-box">
+              <small>LIVE PRICE</small>
+              <div class="live-price">${dashboardEscape(t.current)}</div>
+              <strong class="${t.stateClass}">${dashboardEscape(t.label)}</strong>
             </div>
-            ${valid ? `
-              <div class="tracking-bar">
-                <div class="tracking-label"><span>Entry</span><span>TP3</span></div>
-                <div class="tracking-track"><div class="tracking-fill"></div></div>
-                <small>Live price is not supplied by the current signals API yet.</small>
+
+            <div class="tracking-levels">
+              <span>Entry <b>${dashboardEscape(fmt(s.entry ?? s.entryLow))}</b></span>
+              <span>SL <b class="red">${dashboardEscape(fmt(s.sl))}</b></span>
+              <span>TP1 <b class="green">${dashboardEscape(fmt(s.tp1))}</b></span>
+              <span>TP2 <b class="green">${dashboardEscape(fmt(s.tp2))}</b></span>
+              <span>TP3 <b class="green">${dashboardEscape(fmt(s.tp3))}</b></span>
+            </div>
+
+            <div class="tracking-bar">
+              <div class="tracking-label">
+                <span>Entry</span>
+                <span>TP3</span>
               </div>
-            ` : `
-              <small>Waiting for complete price levels.</small>
-            `}
-            <button class="refresh-button" onclick="openSignalDetails('${dashboardEscape(s.id)}')">Open Details</button>
+              <div class="tracking-track">
+                <div class="tracking-fill ${t.stateClass}" style="width:${t.progress.toFixed(1)}%"></div>
+              </div>
+              <div class="tracking-percent">${t.progress.toFixed(1)}%</div>
+            </div>
+
+            <button class="refresh-button" onclick="openSignalDetails('${dashboardEscape(s.id)}')">
+              Open Details
+            </button>
           </div>
         `;
       }).join("") : `
-        <div class="card"><strong>No active signals</strong><p>Waiting for new signals.</p></div>
+        <div class="card">
+          <strong>No active signals</strong>
+          <p>Waiting for new signals.</p>
+        </div>
       `}
-      <div class="card"><small>Tracking refreshes from the VPS signal feed. Exact live-price progress will activate when the API exposes current market price.</small></div>
+
+      <div class="card">
+        <small>Live prices are read from the CRYPTOSIGNAL46 VPS and OKX. This screen shows current price position; it does not place or modify orders.</small>
+      </div>
     `;
+
   } catch (error) {
     console.error("Live tracking failed:", error);
-    main.innerHTML = `<div class="card"><strong>Could not load live tracking.</strong><p><small>Try again later.</small></p></div>`;
+    main.innerHTML = `
+      <div class="card">
+        <strong>Could not load live tracking.</strong>
+        <p><small>${dashboardEscape(error.message)}</small></p>
+        <button class="refresh-button" onclick="loadLiveTracking()">↻ Retry</button>
+      </div>
+    `;
   }
 }
 
