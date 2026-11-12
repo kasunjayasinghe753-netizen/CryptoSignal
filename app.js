@@ -253,8 +253,11 @@ function renderDashboard(signals = window.CRYPTOSIGNAL46_SIGNALS || [],
     </div>
 
     <div class="dashboard-section-title">
-      <h3>Latest Signals</h3>
-      <small>Refreshes every 30 seconds</small>
+      <div>
+        <h3>Latest Signals</h3>
+        <small id="scanNowStatus">Refreshes every 30 seconds</small>
+      </div>
+      <button id="scanNowButton" class="refresh-button" onclick="scanNow()">⚡ SCAN NOW</button>
     </div>
 
     ${latest.length ? latest.map(signal => {
@@ -290,6 +293,83 @@ function renderDashboard(signals = window.CRYPTOSIGNAL46_SIGNALS || [],
       </div>
     `}
   `;
+}
+
+async function scanNow() {
+  const button = document.getElementById("scanNowButton");
+  const status = document.getElementById("scanNowStatus");
+
+  if (button) {
+    button.disabled = true;
+    button.textContent = "⏳ SCANNING...";
+  }
+  if (status) {
+    status.textContent = "Requesting immediate scan...";
+  }
+
+  try {
+    const before = (window.CRYPTOSIGNAL46_SIGNALS || [])
+      .reduce((max, s) => Math.max(max, Number(s.id) || 0), 0);
+
+    const response = await fetch(`${API_BASE}/api/scan`, {
+      method: "POST"
+    });
+
+    const data = await response.json();
+
+    if (!response.ok || !data.ok) {
+      throw new Error(data.message || data.error || "Scan request failed");
+    }
+
+    if (status) {
+      status.textContent = "Scan queued. Bot is scanning OKX now...";
+    }
+
+    const started = Date.now();
+    const poll = setInterval(async () => {
+      try {
+        await loadDashboardData();
+
+        const latest = (window.CRYPTOSIGNAL46_SIGNALS || [])
+          .reduce((max, s) => Math.max(max, Number(s.id) || 0), 0);
+
+        if (latest > before) {
+          clearInterval(poll);
+          if (status) {
+            status.textContent = "✅ New signal found and sent to Telegram.";
+          }
+          if (button) {
+            button.disabled = false;
+            button.textContent = "⚡ SCAN NOW";
+          }
+          return;
+        }
+
+        if (Date.now() - started > 180000) {
+          clearInterval(poll);
+          if (status) {
+            status.textContent = "Scan finished/waiting. No new signal yet.";
+          }
+          if (button) {
+            button.disabled = false;
+            button.textContent = "⚡ SCAN NOW";
+          }
+        }
+      } catch (pollError) {
+        console.error("Scan status refresh failed:", pollError);
+      }
+    }, 10000);
+
+  } catch (error) {
+    console.error("Manual scan failed:", error);
+    if (status) {
+      status.textContent = "❌ " + error.message;
+    }
+    if (button) {
+      button.disabled = false;
+      button.textContent = "⚡ SCAN NOW";
+    }
+  }
 }
 
 async function loadDashboardData() {
