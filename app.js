@@ -3,6 +3,7 @@ let signalFilter = "ALL";
 let activePage = "Dashboard";
 let trackingRefreshTimer = null;
 let trackingTimeframe = "15m";
+let performanceData = null;
 
 const API_BASE = "https://187.55.163.68";
 
@@ -217,9 +218,22 @@ function renderDashboard(signals = window.CRYPTOSIGNAL46_SIGNALS || [],
   const losses = history.filter(s =>
     String(s.result || "").toUpperCase() === "LOSS"
   ).length;
-  const decided = wins + losses;
-  const winRate = decided ? (wins / decided * 100).toFixed(1) + "%" : "--";
-  const total = active.length + closed;
+  const perf = performanceData || {};
+  const totals = perf.totals || {};
+  const resultCounts = perf.results || {};
+  const tpMilestones = perf.tpMilestones || {};
+  const dashboardWins = Number(resultCounts.WIN ?? wins);
+  const dashboardLosses = Number(resultCounts.LOSS ?? losses);
+  const dashboardBreakeven = Number(resultCounts.BREAKEVEN ?? 0);
+  const dashboardExpired = Number(resultCounts.EXPIRED ?? 0);
+  const activeCount = Number(totals.open ?? active.length) + Number(totals.pending ?? 0);
+  const closedCount = Number(totals.closed ?? closed);
+  const total = Number(totals.all ?? (activeCount + closedCount));
+  const winRate = perf.winRate != null
+    ? Number(perf.winRate).toFixed(1) + "%"
+    : (dashboardWins + dashboardLosses
+        ? (dashboardWins / (dashboardWins + dashboardLosses) * 100).toFixed(1) + "%"
+        : "--");
 
   const latest = [...signals].sort((a, b) => Number(b.id || 0) - Number(a.id || 0)).slice(0, 5);
 
@@ -227,7 +241,7 @@ function renderDashboard(signals = window.CRYPTOSIGNAL46_SIGNALS || [],
     <div class="dashboard-heading">
       <div>
         <h3>Home Dashboard</h3>
-        <small>Live OKX USDT Perpetual signals</small>
+        <small>Live Binance USDT Perpetual signals</small>
       </div>
       <span class="live-indicator">● LIVE</span>
     </div>
@@ -239,17 +253,25 @@ function renderDashboard(signals = window.CRYPTOSIGNAL46_SIGNALS || [],
       </div>
       <div class="card dashboard-active-card" onclick="show('Signals')" role="button" tabindex="0" aria-label="Open active signals">
         <small>ACTIVE SIGNALS</small>
-        <div class="number green">${active.length}</div>
+        <div class="number green">${activeCount}</div>
       </div>
       <div class="card">
         <small>WIN RATE</small>
         <div class="number">${winRate}</div>
-        <small>${wins} wins / ${losses} losses</small>
+        <small>${dashboardWins} wins / ${dashboardLosses} losses</small>
       </div>
       <div class="card">
         <small>CLOSED SIGNALS</small>
-        <div class="number">${closed}</div>
+        <div class="number">${closedCount}</div>
       </div>
+    </div>
+
+    <div class="card">
+      <h3>Performance Overview</h3>
+      <p>Wins: <strong class="green">${dashboardWins}</strong> · Losses: <strong class="red">${dashboardLosses}</strong></p>
+      <p>Breakeven: <strong>${dashboardBreakeven}</strong> · Expired: <strong>${dashboardExpired}</strong></p>
+      <p>TP1: <strong>${Number(tpMilestones.tp1 || 0)}</strong> · TP2: <strong>${Number(tpMilestones.tp2 || 0)}</strong> · TP3: <strong>${Number(tpMilestones.tp3 || 0)}</strong></p>
+      <small>Win rate = wins ÷ (wins + losses); breakeven and expired signals are excluded.</small>
     </div>
 
     <div class="dashboard-section-title">
@@ -322,7 +344,7 @@ async function scanNow() {
     }
 
     if (status) {
-      status.textContent = "Scan queued. Bot is scanning OKX now...";
+      status.textContent = "Scan queued. Bot is scanning Binance now...";
     }
 
     const started = Date.now();
@@ -394,6 +416,17 @@ async function loadDashboardData() {
     window.CRYPTOSIGNAL46_HISTORY = historyRows.map(mapApiSignal);
 
     renderSignals(window.CRYPTOSIGNAL46_SIGNALS);
+
+    try {
+      const performanceResponse = await fetch(`${API_BASE}/api/performance`);
+      if (performanceResponse.ok) {
+        const nextPerformance = await performanceResponse.json();
+        if (nextPerformance && nextPerformance.ok) performanceData = nextPerformance;
+      }
+    } catch (performanceError) {
+      console.warn("Performance API unavailable:", performanceError);
+    }
+
     renderDashboard();
     console.log("CRYPTOSIGNAL46: Dashboard updated", {
       active: signalRows.length,
@@ -550,29 +583,27 @@ async function loadDailyReport() {
 
 
 
-function okxInstId(symbol) {
-  return String(symbol || "")
-    .replace("/USDT:USDT", "-USDT-SWAP")
-    .replace("/USDT", "-USDT")
-    .replace("/", "-");
+function binanceSymbol(symbol) {
+  return String(symbol || "").replace(/:USDT$/, "").replace("/", "");
 }
 
-async function loadOKXCandles(symbol, bar = trackingTimeframe) {
-  const instId = okxInstId(symbol);
-  const url = "https://www.okx.com/api/v5/market/candles?instId="
-    + encodeURIComponent(instId)
-    + "&bar=" + encodeURIComponent(bar)
+async function loadBinanceCandles(symbol, bar = trackingTimeframe) {
+  const marketSymbol = binanceSymbol(symbol);
+  const interval = String(bar || "15m").toLowerCase();
+  const url = "https://fapi.binance.com/fapi/v1/klines?symbol="
+    + encodeURIComponent(marketSymbol)
+    + "&interval=" + encodeURIComponent(interval)
     + "&limit=60";
 
   const response = await fetch(url);
-  if (!response.ok) throw new Error("OKX candles error: " + response.status);
+  if (!response.ok) throw new Error("Binance Futures candles error: " + response.status);
 
   const data = await response.json();
-  if (data.code !== "0" || !Array.isArray(data.data)) {
-    throw new Error("OKX candles unavailable");
+  if (!Array.isArray(data)) {
+    throw new Error("Binance Futures candles unavailable");
   }
 
-  return data.data.reverse().map(row => ({
+  return data.map(row => ({
     ts: Number(row[0]),
     open: Number(row[1]),
     high: Number(row[2]),
@@ -700,7 +731,7 @@ function drawTrackingChart(canvas, candles, signal) {
   ctx.fillStyle = "#8290a3";
   ctx.font = "10px Arial";
   ctx.fillText(trackingTimeframe.toUpperCase(), pad.left, height - 9);
-  ctx.fillText("OKX", width - 36, height - 9);
+  ctx.fillText("BINANCE", width - 55, height - 9);
 }
 
 async function renderTrackingCharts(active) {
@@ -709,7 +740,7 @@ async function renderTrackingCharts(active) {
     if (!canvas) return;
 
     try {
-      const candles = await loadOKXCandles(signal.symbol, trackingTimeframe);
+      const candles = await loadBinanceCandles(signal.symbol, trackingTimeframe);
       drawTrackingChart(canvas, candles, signal);
     } catch (error) {
       console.error("Chart failed:", signal.symbol, error);
@@ -735,7 +766,7 @@ async function loadLiveTracking(timeframe = trackingTimeframe) {
     <div class="dashboard-heading">
       <div>
         <h3>Live TP / SL Tracking</h3>
-        <small>Current OKX price vs Entry / TP / SL</small>
+        <small>Current Binance Futures price vs Entry / TP / SL</small>
       </div>
       <span class="live-indicator">● LIVE</span>
     </div>
@@ -846,7 +877,7 @@ async function loadLiveTracking(timeframe = trackingTimeframe) {
       <div class="dashboard-heading">
         <div>
           <h3>Live TP / SL Tracking</h3>
-          <small>${active.length} active signals • OKX live price</small>
+          <small>${active.length} active signals • Binance live price</small>
         </div>
         <span class="live-indicator">● LIVE</span>
       </div>
@@ -879,7 +910,7 @@ async function loadLiveTracking(timeframe = trackingTimeframe) {
                 </div>
               </div>
               <canvas id="tracking-chart-${dashboardEscape(s.id)}" class="tracking-chart"></canvas>
-              <div class="chart-note">OKX candles • ${dashboardEscape(t.label)} • live market view</div>
+              <div class="chart-note">Binance Futures candles • ${dashboardEscape(t.label)} • live market view</div>
             </div>
 
             <div class="tracking-levels">
@@ -921,7 +952,7 @@ async function loadLiveTracking(timeframe = trackingTimeframe) {
       `}
 
       <div class="card">
-        <small>Live prices and candles are read from OKX. This screen shows current market position; it does not place or modify orders.</small>
+        <small>Live prices are read from the CRYPTOSIGNAL46 Binance API and candles from Binance Futures. This screen does not place or modify orders.</small>
       </div>
     `;
 
@@ -1003,7 +1034,7 @@ function show(page) {
         <div class="active-signal-top">
           <div>
             <strong id="signalCount">0 Active Signals</strong>
-            <p class="muted">Market: OKX USDT Perpetual</p>
+            <p class="muted">Market: Binance USDT Perpetual</p>
           </div>
           <button class="refresh-button" onclick="loadCryptoSignals()">↻ Refresh</button>
         </div>
