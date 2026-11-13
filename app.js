@@ -218,8 +218,6 @@ function renderDashboard(signals = window.CRYPTOSIGNAL46_SIGNALS || [],
   const losses = history.filter(s =>
     String(s.result || "").toUpperCase() === "LOSS"
   ).length;
-  const decided = wins + losses;
-  const winRate = decided ? (wins / decided * 100).toFixed(1) + "%" : "--";
   const perf = performanceData || {};
   const totals = perf.totals || {};
   const resultCounts = perf.results || {};
