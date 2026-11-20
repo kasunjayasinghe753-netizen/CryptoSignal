@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -7,14 +6,11 @@
 <meta name="theme-color" content="#080d16">
 <meta name="description" content="CRYPTOSIGNAL46 Crypto Futures Signal Center">
 <title>CRYPTOSIGNAL46</title>
-
-<link rel="stylesheet" href="style.css">
-<link rel="manifest" href="/manifest.json">
-<link rel="icon" href="/icon.svg" type="image/svg+xml">
-
+<link rel="stylesheet" href="./style.css">
+<link rel="manifest" href="./manifest.json">
+<link rel="icon" href="./icon.svg" type="image/svg+xml">
 </head>
 <body>
-
 <header>
   <div class="logo">46</div>
   <div>
@@ -22,7 +18,6 @@
     <small>TRADING SIGNAL CENTER</small>
   </div>
 </header>
-
 <main>
   <h3>Home Dashboard</h3>
   <div class="card">
@@ -30,7 +25,6 @@
     <p><small>Live dashboard data will appear here shortly.</small></p>
   </div>
 </main>
-
 <nav>
   <button onclick="show('Dashboard')">⌂<br>Home</button>
   <button onclick="show('Signals')">◈<br>Signals</button>
@@ -39,8 +33,15 @@
   <button onclick="show('Report')">▤<br>Report</button>
   <button onclick="show('Tracking')">◉<br>Track</button>
 </nav>
-
-<script src="app.js"></script>
-
+<script src="./app.js"></script>
+<script>
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./sw.js").catch((error) => {
+      console.error("Service worker registration failed:", error);
+    });
+  });
+}
+</script>
 </body>
 </html>
