@@ -1,0 +1,8 @@
+{
+  "appId": "com.cryptosignal46.app",
+  "appName": "CRYPTOSIGNAL46",
+  "webDir": "www",
+  "server": {
+    "androidScheme": "https"
+  }
+}
