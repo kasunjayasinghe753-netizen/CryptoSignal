@@ -1,17 +1,20 @@
 {
+  "id": "./",
   "name": "CRYPTOSIGNAL46",
   "short_name": "CRYPTO46",
   "description": "Crypto Futures Signal Center",
-  "start_url": "/",
-  "scope": "/",
+  "start_url": "./",
+  "scope": "./",
   "display": "standalone",
+  "orientation": "portrait",
   "background_color": "#080d16",
   "theme_color": "#080d16",
   "icons": [
     {
-      "src": "/icon.svg",
+      "src": "./icon.svg",
       "sizes": "any",
-      "type": "image/svg+xml"
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
     }
   ]
 }
