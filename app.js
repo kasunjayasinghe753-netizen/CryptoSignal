@@ -7,6 +7,121 @@ let performanceData = null;
 
 const API_BASE = "https://187.55.163.68";
 
+function getAuthToken() {
+  return localStorage.getItem("c46_auth_token") ||
+         sessionStorage.getItem("c46_auth_token") || "";
+}
+
+function showLogin(message = "") {
+  window.__authExpired = true;
+  document.body.classList.add("auth-locked");
+  const nav = document.querySelector("nav");
+  if (nav) nav.style.display = "none";
+  const main = document.querySelector("main");
+  if (!main) return;
+  main.innerHTML = `
+    <section class="login-wrap">
+      <div class="login-card">
+        <div class="login-mark">46</div>
+        <h2>CRYPTOSIGNAL46</h2>
+        <p class="login-subtitle">PRIVATE SIGNAL CENTER</p>
+        <form onsubmit="loginApp(event)">
+          <label for="loginUsername">Username</label>
+          <input id="loginUsername" name="username" autocomplete="username"
+                 value="admin" required>
+          <label for="loginPassword">Password</label>
+          <input id="loginPassword" name="password" type="password"
+                 autocomplete="current-password" placeholder="Enter your password" required>
+          <label class="remember-row">
+            <input id="rememberMe" type="checkbox">
+            Remember me on this device
+          </label>
+          <button id="loginButton" type="submit">SECURE LOGIN</button>
+          <p id="loginError" class="login-error">${message}</p>
+        </form>
+        <small class="login-foot">Your account is private and protected.</small>
+      </div>
+    </section>
+  `;
+}
+
+async function loginApp(event) {
+  event.preventDefault();
+  const button = document.getElementById("loginButton");
+  const error = document.getElementById("loginError");
+  const username = document.getElementById("loginUsername").value.trim();
+  const password = document.getElementById("loginPassword").value;
+  const remember = document.getElementById("rememberMe").checked;
+  button.disabled = true;
+  button.textContent = "CHECKING...";
+  error.textContent = "";
+
+  try {
+    const response = await fetch(`${API_BASE}/api/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password })
+    });
+    const data = await response.json();
+    if (!response.ok || !data.ok || !data.token) {
+      throw new Error(data.error || "Login failed");
+    }
+
+    localStorage.removeItem("c46_auth_token");
+    sessionStorage.removeItem("c46_auth_token");
+    (remember ? localStorage : sessionStorage)
+      .setItem("c46_auth_token", data.token);
+
+    window.__authExpired = false;
+    document.body.classList.remove("auth-locked");
+    const nav = document.querySelector("nav");
+    if (nav) nav.style.display = "";
+
+    let logout = document.getElementById("logoutButton");
+    if (!logout) {
+      logout = document.createElement("button");
+      logout.id = "logoutButton";
+      logout.type = "button";
+      logout.textContent = "LOG OUT";
+      logout.onclick = logoutApp;
+      document.querySelector("header").appendChild(logout);
+    }
+    loadDashboardData();
+  } catch (err) {
+    error.textContent = err.message === "Failed to fetch"
+      ? "Cannot connect to server. Please try again."
+      : err.message;
+    button.disabled = false;
+    button.textContent = "SECURE LOGIN";
+  }
+}
+
+function logoutApp() {
+  localStorage.removeItem("c46_auth_token");
+  sessionStorage.removeItem("c46_auth_token");
+  const logout = document.getElementById("logoutButton");
+  if (logout) logout.remove();
+  showLogin("You have been logged out.");
+}
+
+async function apiFetch(path, options = {}) {
+  const headers = new Headers(options.headers || {});
+  const token = getAuthToken();
+  if (token) headers.set("Authorization", "Bearer " + token);
+  const response = await fetch(`${API_BASE}${path}`, {
+    ...options,
+    headers
+  });
+  if (response.status === 401) {
+    localStorage.removeItem("c46_auth_token");
+    sessionStorage.removeItem("c46_auth_token");
+    const logout = document.getElementById("logoutButton");
+    if (logout) logout.remove();
+    showLogin("Your session expired. Please log in again.");
+  }
+  return response;
+}
+
 window.CRYPTOSIGNAL46_SIGNALS = [];
 window.CRYPTOSIGNAL46_HISTORY = [];
 
@@ -41,7 +156,7 @@ function mapApiSignal(s) {
 
 async function loadCryptoSignals() {
   try {
-    const response = await fetch(`${API_BASE}/api/signals`);
+    const response = await apiFetch("/api/signals");
 
     if (!response.ok) {
       throw new Error("Signals API error: " + response.status);
@@ -58,6 +173,7 @@ async function loadCryptoSignals() {
     console.log("CRYPTOSIGNAL46: Signals updated", rows.length);
 
   } catch (error) {
+    if (window.__authExpired) return;
     console.error("Signal loading failed:", error);
   }
 }
@@ -71,7 +187,7 @@ async function loadSignalHistory() {
   `;
 
   try {
-    const response = await fetch(`${API_BASE}/api/history`);
+    const response = await apiFetch("/api/history");
 
     if (!response.ok) {
       throw new Error("History API error: " + response.status);
@@ -137,6 +253,7 @@ async function loadSignalHistory() {
     `;
 
   } catch (error) {
+    if (window.__authExpired) return;
     console.error("History loading failed:", error);
 
     main.innerHTML = `
@@ -333,7 +450,7 @@ async function scanNow() {
     const before = (window.CRYPTOSIGNAL46_SIGNALS || [])
       .reduce((max, s) => Math.max(max, Number(s.id) || 0), 0);
 
-    const response = await fetch(`${API_BASE}/api/scan`, {
+    const response = await apiFetch("/api/scan", {
       method: "POST"
     });
 
@@ -378,11 +495,13 @@ async function scanNow() {
           }
         }
       } catch (pollError) {
+    if (window.__authExpired) return;
         console.error("Scan status refresh failed:", pollError);
       }
     }, 10000);
 
   } catch (error) {
+    if (window.__authExpired) return;
     console.error("Manual scan failed:", error);
     if (status) {
       status.textContent = "❌ " + error.message;
@@ -397,8 +516,8 @@ async function scanNow() {
 async function loadDashboardData() {
   try {
     const [signalsResponse, historyResponse] = await Promise.all([
-      fetch(`${API_BASE}/api/signals`),
-      fetch(`${API_BASE}/api/history`)
+      apiFetch("/api/signals"),
+      apiFetch("/api/history")
     ]);
 
     if (!signalsResponse.ok) throw new Error("Signals API error: " + signalsResponse.status);
@@ -418,12 +537,13 @@ async function loadDashboardData() {
     renderSignals(window.CRYPTOSIGNAL46_SIGNALS);
 
     try {
-      const performanceResponse = await fetch(`${API_BASE}/api/performance`);
+      const performanceResponse = await apiFetch("/api/performance");
       if (performanceResponse.ok) {
         const nextPerformance = await performanceResponse.json();
         if (nextPerformance && nextPerformance.ok) performanceData = nextPerformance;
       }
     } catch (performanceError) {
+    if (window.__authExpired) return;
       console.warn("Performance API unavailable:", performanceError);
     }
 
@@ -433,6 +553,7 @@ async function loadDashboardData() {
       closed: historyRows.length
     });
   } catch (error) {
+    if (window.__authExpired) return;
     console.error("Dashboard loading failed:", error);
     if (activePage === "Dashboard") {
       const main = document.querySelector("main");
@@ -464,7 +585,7 @@ async function loadDailyReport() {
   `;
 
   try {
-    const response = await fetch(`${API_BASE}/api/history`);
+    const response = await apiFetch("/api/history");
     if (!response.ok) throw new Error("History API error: " + response.status);
 
     const data = await response.json();
@@ -570,6 +691,7 @@ async function loadDailyReport() {
       </div>
     `;
   } catch (error) {
+    if (window.__authExpired) return;
     console.error("Daily report loading failed:", error);
     main.innerHTML = `
       <h3>Daily Report</h3>
@@ -743,6 +865,7 @@ async function renderTrackingCharts(active) {
       const candles = await loadBinanceCandles(signal.symbol, trackingTimeframe);
       drawTrackingChart(canvas, candles, signal);
     } catch (error) {
+    if (window.__authExpired) return;
       console.error("Chart failed:", signal.symbol, error);
       const ctx = canvas.getContext("2d");
       const width = canvas.clientWidth || 300;
@@ -775,8 +898,8 @@ async function loadLiveTracking(timeframe = trackingTimeframe) {
 
   try {
     const [signalsResponse, pricesResponse] = await Promise.all([
-      fetch(`${API_BASE}/api/signals`),
-      fetch(`${API_BASE}/api/prices`)
+      apiFetch("/api/signals"),
+      apiFetch("/api/prices")
     ]);
 
     if (!signalsResponse.ok) throw new Error("Signals API error: " + signalsResponse.status);
@@ -959,6 +1082,7 @@ async function loadLiveTracking(timeframe = trackingTimeframe) {
     await renderTrackingCharts(active);
 
   } catch (error) {
+    if (window.__authExpired) return;
     console.error("Live tracking failed:", error);
     main.innerHTML = `
       <div class="card">
@@ -1333,6 +1457,24 @@ document.addEventListener("keydown", event => {
 
 // Load the live dashboard when the app opens and refresh it every 30 seconds.
 window.addEventListener("load", () => {
-  loadDashboardData();
-  setInterval(loadDashboardData, 30 * 1000);
+  if (getAuthToken()) {
+    window.__authExpired = false;
+    const nav = document.querySelector("nav");
+    if (nav) nav.style.display = "";
+    let logout = document.getElementById("logoutButton");
+    if (!logout) {
+      logout = document.createElement("button");
+      logout.id = "logoutButton";
+      logout.type = "button";
+      logout.textContent = "LOG OUT";
+      logout.onclick = logoutApp;
+      document.querySelector("header").appendChild(logout);
+    }
+    loadDashboardData();
+  } else {
+    showLogin();
+  }
+  setInterval(() => {
+    if (getAuthToken() && !window.__authExpired) loadDashboardData();
+  }, 30 * 1000);
 });
