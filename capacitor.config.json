@@ -3,6 +3,8 @@
   "appName": "CRYPTOSIGNAL46",
   "webDir": "www",
   "server": {
+    "url": "https://kasunjayasinghe753-netizen.github.io/CryptoSignal/",
+    "cleartext": false,
     "androidScheme": "https"
   }
 }
