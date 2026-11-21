@@ -721,6 +721,24 @@ async function loadDailyReport() {
       </div>
 
       <div class="card">
+        <h3>Outcome Breakdown</h3>
+        <p class="settings-help">Closed signals for ${todayKey} · ${today.length} total</p>
+        <div class="outcome-stack" role="img" aria-label="Wins ${wins}, losses ${losses}, breakeven ${breakeven}, other ${Math.max(0, today.length - wins - losses - breakeven)}">
+          <span class="outcome-segment outcome-win" style="width:${today.length ? wins / today.length * 100 : 0}%"></span>
+          <span class="outcome-segment outcome-loss" style="width:${today.length ? losses / today.length * 100 : 0}%"></span>
+          <span class="outcome-segment outcome-even" style="width:${today.length ? breakeven / today.length * 100 : 0}%"></span>
+          <span class="outcome-segment outcome-other" style="width:${today.length ? Math.max(0, today.length - wins - losses - breakeven) / today.length * 100 : 0}%"></span>
+        </div>
+        <div class="outcome-legend">
+          <span><i class="outcome-dot outcome-win"></i>Wins <strong>${wins}</strong></span>
+          <span><i class="outcome-dot outcome-loss"></i>Losses <strong>${losses}</strong></span>
+          <span><i class="outcome-dot outcome-even"></i>Breakeven <strong>${breakeven}</strong></span>
+          <span><i class="outcome-dot outcome-other"></i>Other <strong>${Math.max(0, today.length - wins - losses - breakeven)}</strong></span>
+        </div>
+        <small class="settings-note">Win rate excludes breakeven and other results.</small>
+      </div>
+
+      <div class="card">
         <h3>TP / SL Results</h3>
         <p>TP1: <strong class="green">${tp1}</strong></p>
         <p>TP2: <strong class="green">${tp2}</strong></p>
