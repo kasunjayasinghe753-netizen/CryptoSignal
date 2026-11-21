@@ -19,9 +19,7 @@ async function setupPushNotifications() {
   if (!getAuthToken() || !cap || typeof cap.isNativePlatform !== "function" ||
       !cap.isNativePlatform() || c46PushInitStarted) return;
 
-  const PushNotifications = typeof cap.registerPlugin === "function"
-    ? cap.registerPlugin("PushNotifications")
-    : cap.Plugins?.PushNotifications;
+  const PushNotifications = window.C46PushNotifications;
 
   if (!PushNotifications) {
     console.warn("Push Notifications plugin is not available in this APK.");
