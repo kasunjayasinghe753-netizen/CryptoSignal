@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "51264714712",
+    "project_id": "cryptosignal46",
+    "storage_bucket": "cryptosignal46.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:51264714712:android:3dde5dc6432f9c4c8ce4ad",
+        "android_client_info": {
+          "package_name": "com.cryptosignal46.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCdsCbX5q3IE5WDFYAtMU-sS9xHaI1JgTA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
