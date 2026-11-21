@@ -12,6 +12,72 @@ function getAuthToken() {
          sessionStorage.getItem("c46_auth_token") || "";
 }
 
+let c46PushInitStarted = false;
+
+async function setupPushNotifications() {
+  const cap = window.Capacitor;
+  if (!getAuthToken() || !cap || typeof cap.isNativePlatform !== "function" ||
+      !cap.isNativePlatform() || c46PushInitStarted) return;
+
+  const PushNotifications = typeof cap.registerPlugin === "function"
+    ? cap.registerPlugin("PushNotifications")
+    : cap.Plugins?.PushNotifications;
+
+  if (!PushNotifications) {
+    console.warn("Push Notifications plugin is not available in this APK.");
+    return;
+  }
+
+  c46PushInitStarted = true;
+
+  try {
+    await PushNotifications.addListener("registration", async (token) => {
+      try {
+        const response = await apiFetch("/api/register-device", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token: token.value })
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || !data.ok) {
+          throw new Error(data.error || "Device registration failed");
+        }
+        console.info("CRYPTOSIGNAL46 push device registered.");
+      } catch (error) {
+        console.error("Push device API registration failed:", error);
+      }
+    });
+
+    await PushNotifications.addListener("registrationError", (error) => {
+      console.error("FCM registration error:", error.error || error);
+      c46PushInitStarted = false;
+    });
+
+    await PushNotifications.createChannel({
+      id: "signals",
+      name: "Signal Alerts",
+      description: "New CRYPTOSIGNAL46 trading signals",
+      importance: 4,
+      vibration: getAppSettings().vibration !== false
+    });
+
+    let permission = await PushNotifications.checkPermissions();
+    if (permission.receive === "prompt" ||
+        permission.receive === "prompt-with-rationale") {
+      permission = await PushNotifications.requestPermissions();
+    }
+    if (permission.receive !== "granted") {
+      console.warn("Push notification permission was not granted.");
+      return;
+    }
+
+    await PushNotifications.register();
+  } catch (error) {
+    c46PushInitStarted = false;
+    console.error("Could not initialize push notifications:", error);
+  }
+}
+
 function showLogin(message = "") {
   window.__authExpired = true;
   document.body.classList.add("auth-locked");
@@ -87,6 +153,7 @@ async function loginApp(event) {
       document.querySelector("header").appendChild(logout);
     }
     loadDashboardData();
+    setupPushNotifications();
   } catch (err) {
     error.textContent = err.message === "Failed to fetch"
       ? "Cannot connect to server. Please try again."
@@ -1562,6 +1629,7 @@ window.addEventListener("load", () => {
       document.querySelector("header").appendChild(logout);
     }
     loadDashboardData();
+    setupPushNotifications();
   } else {
     showLogin();
   }
