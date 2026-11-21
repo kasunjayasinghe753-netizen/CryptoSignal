@@ -57,6 +57,9 @@ jobs:
       - name: Generate Android project
         run: npx cap add android
 
+      - name: Generate custom notification sounds
+        run: node scripts/create-notification-sounds.mjs
+
       - name: Add Firebase configuration
         run: cp google-services.json android/app/google-services.json
 
