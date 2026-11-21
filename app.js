@@ -13,6 +13,50 @@ function getAuthToken() {
 }
 
 let c46PushInitStarted = false;
+let c46FcmToken = "";
+
+function getPushPreferencePayload() {
+  const settings = getAppSettings();
+  const sound = ["classic", "soft", "double"].includes(settings.sound)
+    ? settings.sound : "classic";
+  const vibration = settings.vibration !== false;
+  const alerts = settings.alerts !== false;
+  return {
+    alerts,
+    vibration,
+    sound,
+    channel_id: `c46_${sound}_${vibration ? "vib" : "silent"}`
+  };
+}
+
+async function syncPushPreferences() {
+  const PushNotifications = window.C46PushNotifications;
+  const cap = window.Capacitor;
+  if (!PushNotifications || !cap || typeof cap.isNativePlatform !== "function" ||
+      !cap.isNativePlatform()) return;
+
+  const prefs = getPushPreferencePayload();
+  await PushNotifications.createChannel({
+    id: prefs.channel_id,
+    name: `Signal Alerts - ${prefs.sound} - ${prefs.vibration ? "Vibration" : "No vibration"}`,
+    description: "CRYPTOSIGNAL46 signal notifications",
+    importance: 4,
+    sound: `c46_${prefs.sound}.wav`,
+    vibration: prefs.vibration
+  });
+
+  if (!c46FcmToken || !getAuthToken()) return;
+  const response = await apiFetch("/api/register-device", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ token: c46FcmToken, ...prefs })
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || !data.ok) {
+    throw new Error(data.error || "Device preferences could not be saved");
+  }
+  console.info("CRYPTOSIGNAL46 notification preferences synced.");
+}
 
 async function setupPushNotifications() {
   const cap = window.Capacitor;
@@ -20,7 +64,6 @@ async function setupPushNotifications() {
       !cap.isNativePlatform() || c46PushInitStarted) return;
 
   const PushNotifications = window.C46PushNotifications;
-
   if (!PushNotifications) {
     console.warn("Push Notifications plugin is not available in this APK.");
     return;
@@ -31,15 +74,8 @@ async function setupPushNotifications() {
   try {
     await PushNotifications.addListener("registration", async (token) => {
       try {
-        const response = await apiFetch("/api/register-device", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ token: token.value })
-        });
-        const data = await response.json().catch(() => ({}));
-        if (!response.ok || !data.ok) {
-          throw new Error(data.error || "Device registration failed");
-        }
+        c46FcmToken = token.value;
+        await syncPushPreferences();
         console.info("CRYPTOSIGNAL46 push device registered.");
       } catch (error) {
         console.error("Push device API registration failed:", error);
@@ -89,13 +125,7 @@ async function setupPushNotifications() {
       c46PushInitStarted = false;
     });
 
-    await PushNotifications.createChannel({
-      id: "signals",
-      name: "Signal Alerts",
-      description: "New CRYPTOSIGNAL46 trading signals",
-      importance: 4,
-      vibration: getAppSettings().vibration !== false
-    });
+    await syncPushPreferences();
 
     let permission = await PushNotifications.checkPermissions();
     if (permission.receive === "prompt" ||
@@ -1228,6 +1258,11 @@ function saveAppSetting(key, value) {
   const settings = getAppSettings();
   settings[key] = value;
   localStorage.setItem("c46_app_settings", JSON.stringify(settings));
+  if (["alerts", "sound", "vibration"].includes(key)) {
+    syncPushPreferences().catch(error => {
+      console.error("Could not apply push notification preferences:", error);
+    });
+  }
 }
 
 function applyAppTheme(theme = getAppSettings().theme || "dark") {
@@ -1294,7 +1329,7 @@ function renderSettings() {
       </select>
       <button class="settings-test-button" onclick="playSettingsSound()">▶ Test sound</button>
       <button class="settings-test-button secondary" onclick="if(navigator.vibrate) navigator.vibrate([120,70,120]); else alert('Vibration is not supported on this device.')">▧ Test vibration</button>
-      <p class="settings-note">Sound and vibration previews work here. Connecting these preferences to live signal notifications is a separate app update.</p>
+      <p class="settings-note">These settings control new signal push notifications on this device. Android may require notification permission to be enabled.</p>
     </section>
     <section class="settings-group settings-about"><h4>About</h4><div class="setting-row"><strong>CRYPTOSIGNAL46</strong><span>Version 1.0</span></div><small>Signal information only. The app does not place trades automatically.</small></section>
   `;
