@@ -1183,7 +1183,12 @@ function show(page) {
   activePage = page;
   const main = document.querySelector("main");
 
-  if (page === "Settings") {\n    renderSettings();\n    return;\n  }\n\n  if (page === "Dashboard") {
+  if (page === "Settings") {
+    renderSettings();
+    return;
+  }
+
+  if (page === "Dashboard") {
     renderDashboard();
     loadDashboardData();
     return;
