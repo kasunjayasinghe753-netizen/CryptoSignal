@@ -1096,11 +1096,94 @@ async function loadLiveTracking(timeframe = trackingTimeframe) {
   }
 }
 
+
+function getAppSettings() {
+  try {
+    return JSON.parse(localStorage.getItem("c46_app_settings") || "{}");
+  } catch (_) { return {}; }
+}
+
+function saveAppSetting(key, value) {
+  const settings = getAppSettings();
+  settings[key] = value;
+  localStorage.setItem("c46_app_settings", JSON.stringify(settings));
+}
+
+function applyAppTheme(theme = getAppSettings().theme || "dark") {
+  const resolved = theme === "auto"
+    ? (window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark")
+    : theme;
+  document.documentElement.dataset.theme = resolved;
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.content = resolved === "light" ? "#f3f6fb" : "#080d16";
+}
+
+function playSettingsSound() {
+  const choice = document.getElementById("settingSound")?.value || "classic";
+  try {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return alert("Sound preview is not supported on this device.");
+    const ctx = new AudioCtx();
+    const frequencies = choice === "soft" ? [520] : choice === "double" ? [660, 880] : [740];
+    frequencies.forEach((frequency, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.frequency.value = frequency;
+      osc.type = "sine";
+      gain.gain.setValueAtTime(0.0001, ctx.currentTime + i * 0.16);
+      gain.gain.exponentialRampToValueAtTime(0.12, ctx.currentTime + i * 0.16 + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + i * 0.16 + 0.18);
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.start(ctx.currentTime + i * 0.16);
+      osc.stop(ctx.currentTime + i * 0.16 + 0.2);
+    });
+    setTimeout(() => ctx.close(), 900);
+  } catch (_) { alert("Unable to play sound preview."); }
+}
+
+function renderSettings() {
+  const settings = getAppSettings();
+  const theme = settings.theme || "dark";
+  const sound = settings.sound || "classic";
+  const vibration = settings.vibration !== false;
+  const alerts = settings.alerts !== false;
+  const main = document.querySelector("main");
+  main.innerHTML = `
+    <div class="page-heading"><div><p class="eyebrow">PERSONALIZE YOUR APP</p><h3>Settings</h3><small>Make CRYPTOSIGNAL46 work the way you like</small></div><span class="settings-icon">⚙</span></div>
+    <section class="settings-group">
+      <h4>Appearance</h4>
+      <p class="settings-help">Choose how the app looks on your phone.</p>
+      <label for="settingTheme">App theme</label>
+      <select id="settingTheme" onchange="saveAppSetting('theme',this.value);applyAppTheme(this.value)">
+        <option value="dark" ${theme==="dark"?"selected":""}>Dark</option>
+        <option value="light" ${theme==="light"?"selected":""}>Light</option>
+        <option value="auto" ${theme==="auto"?"selected":""}>Auto (device setting)</option>
+      </select>
+    </section>
+    <section class="settings-group">
+      <h4>Notifications</h4>
+      <p class="settings-help">Notification preferences for app alerts.</p>
+      <div class="setting-row"><div><strong>Signal alerts</strong><small>Enable app alert preferences</small></div><input type="checkbox" id="settingAlerts" ${alerts?"checked":""} onchange="saveAppSetting('alerts',this.checked)"></div>
+      <div class="setting-row"><div><strong>Vibration</strong><small>Vibrate when an alert is triggered</small></div><input type="checkbox" id="settingVibration" ${vibration?"checked":""} onchange="saveAppSetting('vibration',this.checked)"></div>
+      <label for="settingSound">Alert sound</label>
+      <select id="settingSound" onchange="saveAppSetting('sound',this.value)">
+        <option value="classic" ${sound==="classic"?"selected":""}>Classic</option>
+        <option value="soft" ${sound==="soft"?"selected":""}>Soft</option>
+        <option value="double" ${sound==="double"?"selected":""}>Double tone</option>
+      </select>
+      <button class="settings-test-button" onclick="playSettingsSound()">▶ Test sound</button>
+      <button class="settings-test-button secondary" onclick="if(navigator.vibrate) navigator.vibrate([120,70,120]); else alert('Vibration is not supported on this device.')">▧ Test vibration</button>
+      <p class="settings-note">Sound and vibration previews work here. Connecting these preferences to live signal notifications is a separate app update.</p>
+    </section>
+    <section class="settings-group settings-about"><h4>About</h4><div class="setting-row"><strong>CRYPTOSIGNAL46</strong><span>Version 1.0</span></div><small>Signal information only. The app does not place trades automatically.</small></section>
+  `;
+}
+
 function show(page) {
   activePage = page;
   const main = document.querySelector("main");
 
-  if (page === "Dashboard") {
+  if (page === "Settings") {\n    renderSettings();\n    return;\n  }\n\n  if (page === "Dashboard") {
     renderDashboard();
     loadDashboardData();
     return;
@@ -1458,7 +1541,7 @@ document.addEventListener("keydown", event => {
 });
 
 // Load the live dashboard when the app opens and refresh it every 30 seconds.
-window.addEventListener("load", () => {
+window.addEventListener("load", () => {\n  applyAppTheme();
   if (getAuthToken()) {
     window.__authExpired = false;
     const nav = document.querySelector("nav");
