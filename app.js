@@ -1546,7 +1546,8 @@ document.addEventListener("keydown", event => {
 });
 
 // Load the live dashboard when the app opens and refresh it every 30 seconds.
-window.addEventListener("load", () => {\n  applyAppTheme();
+window.addEventListener("load", () => {
+  applyAppTheme();
   if (getAuthToken()) {
     window.__authExpired = false;
     const nav = document.querySelector("nav");
