@@ -46,6 +46,44 @@ async function setupPushNotifications() {
       }
     });
 
+    await PushNotifications.addListener("pushNotificationActionPerformed", async (action) => {
+      const data = action?.notification?.data || {};
+      const signalId = data.signal_id || data.signalId || data.id;
+      if (signalId == null || String(signalId).trim() === "") {
+        console.warn("Push notification did not contain a signal ID.");
+        return;
+      }
+
+      try {
+        await loadDashboardData();
+        let signal = (window.CRYPTOSIGNAL46_SIGNALS || [])
+          .find(item => String(item.id) === String(signalId));
+
+        if (!signal) {
+          await loadSignalHistory();
+          signal = (window.CRYPTOSIGNAL46_HISTORY || [])
+            .find(item => String(item.id) === String(signalId));
+        }
+
+        if (signal && !(window.CRYPTOSIGNAL46_SIGNALS || [])
+            .some(item => String(item.id) === String(signalId))) {
+          window.CRYPTOSIGNAL46_SIGNALS = [
+            signal, ...(window.CRYPTOSIGNAL46_SIGNALS || [])
+          ];
+        }
+
+        if (signal) {
+          openSignalDetails(signalId);
+        } else {
+          show("Signals");
+          console.warn("Signal from notification was not found:", signalId);
+        }
+      } catch (error) {
+        console.error("Could not open signal from notification:", error);
+        show("Signals");
+      }
+    });
+
     await PushNotifications.addListener("registrationError", (error) => {
       console.error("FCM registration error:", error.error || error);
       c46PushInitStarted = false;
