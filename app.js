@@ -599,8 +599,10 @@ async function loadDailyReport() {
       day: "2-digit"
     }).format(new Date());
 
+    // Daily performance is based on when a signal CLOSED, not when it was created.
+    // This includes signals opened on earlier days but closed today.
     const today = rows.filter(s => {
-      const raw = s.createdAt;
+      const raw = s.closedAt || s.createdAt;
       if (!raw) return false;
       const d = new Date(raw);
       if (Number.isNaN(d.getTime())) return false;
