@@ -6,5 +6,15 @@
     "url": "https://kasunjayasinghe753-netizen.github.io/CryptoSignal/",
     "cleartext": false,
     "androidScheme": "https"
+  },
+  "plugins": {
+    "PushNotifications": {
+      "presentationOptions": [
+        "alert",
+        "sound",
+        "banner",
+        "list"
+      ]
+    }
   }
 }
